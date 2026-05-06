@@ -663,6 +663,48 @@ input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; marg
 .cc-meta     { display: flex; gap: 0.5rem; flex-wrap: wrap; margin-top: 0.65rem; }
 .cc-actions  { display: flex; gap: 0.4rem; margin-top: 0.75rem; }
 
+/* Frequency toggle switches — one per column */
+.freq-group { display: flex; flex-direction: column; gap: 5px; align-items: flex-start; }
+.freq-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  user-select: none;
+}
+.freq-row-label { display: none; } /* label now lives in the column header */
+/* The sliding toggle track */
+.freq-switch {
+  position: relative;
+  width: 36px;
+  height: 20px;
+  flex-shrink: 0;
+}
+.freq-switch input { display: none; }
+.freq-track {
+  position: absolute; inset: 0;
+  border-radius: 100px;
+  background: var(--surface3);
+  border: 1.5px solid var(--border);
+  transition: background 0.2s, border-color 0.2s;
+}
+.freq-thumb {
+  position: absolute;
+  width: 14px; height: 14px;
+  border-radius: 50%;
+  top: 2px; left: 2px;
+  background: var(--muted);
+  transition: transform 0.2s, background 0.2s;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.4);
+}
+/* Active states */
+.freq-row.on-weekly   .freq-track { background: rgba(234,179,8,0.2);  border-color: var(--yellow); }
+.freq-row.on-weekly   .freq-thumb { transform: translateX(16px); background: var(--yellow); }
+.freq-row.on-biweekly .freq-track { background: var(--orange-g);       border-color: var(--orange); }
+.freq-row.on-biweekly .freq-thumb { transform: translateX(16px); background: var(--orange); }
+.freq-row.on-monthly  .freq-track { background: var(--teal-g);         border-color: var(--teal); }
+.freq-row.on-monthly  .freq-thumb { transform: translateX(16px); background: var(--teal); }
+
 /* Row action buttons */
 .row-actions { display: flex; gap: 0.25rem; justify-content: flex-end; white-space: nowrap; }
 .btn-hide { background: transparent; color: var(--muted); border: 1px solid transparent; padding: 0.28rem 0.5rem; font-size: 0.78rem; border-radius: 4px; cursor: pointer; line-height: 1; transition: all 0.15s; }
@@ -832,7 +874,10 @@ input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; marg
       <div class="section">
         <div class="section-header">
           <h2>🔒 Fixed Expenses</h2>
-          <button class="btn btn-primary btn-sm" id="addFixedBtn">+ Add Category</button>
+          <div class="flex gap-2">
+            <button class="btn btn-secondary btn-sm" id="removeFixedBtn">− Remove Category</button>
+            <button class="btn btn-primary btn-sm" id="addFixedBtn">+ Add Category</button>
+          </div>
         </div>
         <div class="card">
           <div class="table-wrap">
@@ -841,9 +886,11 @@ input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; marg
                 <tr>
                   <th>Category</th>
                   <th style="text-align:right">Budgeted</th>
-                  <th style="text-align:right">Actual</th>
+                  <th style="text-align:right">Actual (Monthly)</th>
                   <th style="text-align:right">Variance</th>
-                  <th></th>
+                  <th style="text-align:center">Weekly</th>
+                  <th style="text-align:center">Bi-Weekly</th>
+                  <th style="text-align:center">Monthly</th>
                 </tr>
               </thead>
               <tbody id="fixedBody"></tbody>
@@ -853,7 +900,7 @@ input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; marg
                   <td class="td-num" id="fixedBudgetTotal">$0.00</td>
                   <td class="td-num fw-700" id="fixedActualTotal">$0.00</td>
                   <td class="td-num" id="fixedVarianceTotal"></td>
-                  <td></td>
+                  <td></td><td></td><td></td>
                 </tr>
               </tfoot>
             </table>
@@ -865,7 +912,10 @@ input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; marg
       <div class="section">
         <div class="section-header">
           <h2>📊 Variable Expenses</h2>
-          <button class="btn btn-primary btn-sm" id="addVariableBtn">+ Add Category</button>
+          <div class="flex gap-2">
+            <button class="btn btn-secondary btn-sm" id="removeVariableBtn">− Remove Category</button>
+            <button class="btn btn-primary btn-sm" id="addVariableBtn">+ Add Category</button>
+          </div>
         </div>
         <div class="card">
           <div class="table-wrap">
@@ -2119,7 +2169,7 @@ function renderHome() {
     <div class="metric-card orange">
       <div class="metric-label">Total Income</div>
       <div class="metric-value num">${fmt(t.totalIncome)}</div>
-      <div class="metric-sub">OBN ${fmt(t.obnTotal)} + Gig ${fmt(t.gigTotal)}</div>
+      <div class="metric-sub">Salary ${fmt(t.obnTotal)} + Gig ${fmt(t.gigTotal)}</div>
     </div>
     <div class="metric-card teal">
       <div class="metric-label">Total Spent</div>
@@ -2442,45 +2492,120 @@ function renderExpenses() {
   renderVariable();
 }
 
-function renderFixed() {
+function getFreq(catId) {
   const m = getMonth(currentMonth);
-  const cats = getAllFixedCats();          // visible only
-  const allCats = getAllFixedCats(true);   // includes hidden
-  const hidden = state.hiddenCats || {};
+  return m.biweekly?.[catId]?.freq || 'monthly';
+}
+
+function setFreq(catId, freq) {
+  const m = getMonth(currentMonth);
+  if (!m.biweekly) m.biweekly = {};
+  if (!m.biweekly[catId]) m.biweekly[catId] = {};
+  m.biweekly[catId].freq = freq;
+  if (freq === 'monthly') {
+    m.biweekly[catId].enabled = false;
+  } else {
+    m.biweekly[catId].enabled = true;
+    const defCount = freq === 'weekly' ? 4 : 2;
+    if (!m.biweekly[catId].count) m.biweekly[catId].count = defCount;
+    const perPmt = parseFloat(m.biweekly[catId].perPayment) || 0;
+    const count  = parseFloat(m.biweekly[catId].count) || defCount;
+    if (!m.fixed) m.fixed = {};
+    if (!m.fixed[catId]) m.fixed[catId] = {};
+    m.fixed[catId].actual = perPmt * count;
+  }
+  saveData(); renderFixed();
+  if (activeTab === 'home') renderHome();
+}
+
+function renderFixed() {
+  const m       = getMonth(currentMonth);
+  const cats    = getAllFixedCats();
+  const allCats = getAllFixedCats(true);
+  const hidden  = state.hiddenCats || {};
+  if (!m.biweekly) m.biweekly = {};
   let totBudget = 0, totActual = 0;
 
   document.getElementById('fixedBody').innerHTML = cats.map(cat => {
-    const d = m.fixed?.[cat.id] || {};
+    const d    = m.fixed?.[cat.id] || {};
+    const freq = getFreq(cat.id);
+    const bw   = m.biweekly?.[cat.id] || {};
+    const defCount = freq === 'weekly' ? 4 : 2;
+    const perPmt   = parseFloat(bw.perPayment) || 0;
+    const count    = parseFloat(bw.count) || defCount;
+    const freqTotal = perPmt * count;
+
     const budgeted = parseFloat(d.budgeted ?? cat.budgeted) || 0;
-    const actual   = parseFloat(d.actual) || 0;
+    const actual   = freq !== 'monthly' ? freqTotal : (parseFloat(d.actual) || 0);
     const variance = actual - budgeted;
     totBudget += budgeted; totActual += actual;
     const varClass = variance > 0 ? 'negative' : variance < 0 ? 'positive' : 'neutral';
     const varStr   = variance !== 0 ? fmtSigned(variance) : '—';
 
+    const freqColor = freq === 'weekly' ? 'var(--yellow)' : 'var(--orange)';
+    const freqLabel = freq === 'weekly' ? 'week' : 'payment';
+
+    const subRow = freq !== 'monthly' ? `
+      <tr style="background:rgba(${freq==='weekly'?'234,179,8':'249,115,22'},0.04)">
+        <td colspan="7" style="padding:0.25rem 0.75rem 0.55rem 1.5rem">
+          <div class="flex items-center gap-2 flex-wrap">
+            <span class="text-xs fw-700" style="color:${freqColor}">
+              ↳ ${freq === 'weekly' ? 'Weekly' : 'Bi-weekly'}:
+            </span>
+            <span class="text-xs text-dim">$</span>
+            <input type="number" class="inline-input" value="${perPmt||''}" placeholder="per ${freqLabel}"
+              min="0" step="0.01" style="max-width:110px;text-align:left"
+              onchange="updateBiweekly('${cat.id}','perPayment',this.value)" />
+            <span class="text-xs text-dim">×</span>
+            <input type="number" class="inline-input" value="${count}" min="1" max="6" step="1"
+              style="max-width:48px;text-align:center"
+              onchange="updateBiweekly('${cat.id}','count',this.value)" />
+            <span class="text-xs text-dim">${freqLabel}s this month =</span>
+            <span class="num fw-700 text-sm" style="color:${freqColor}">${fmt(freqTotal)}</span>
+          </div>
+        </td>
+      </tr>` : '';
+
     return `<tr>
       <td><span class="fw-600">${cat.name}</span></td>
-      <td class="td-num"><input type="number" class="inline-input" value="${budgeted||''}" placeholder="0.00" min="0" step="0.01" onchange="updateExpense('fixed','${cat.id}','budgeted',this.value)" /></td>
-      <td class="td-num"><input type="number" class="inline-input" value="${actual||''}" placeholder="0.00" min="0" step="0.01" onchange="updateExpense('fixed','${cat.id}','actual',this.value)" /></td>
+      <td class="td-num">
+        <input type="number" class="inline-input" value="${budgeted||''}" placeholder="0.00"
+          min="0" step="0.01" onchange="updateExpense('fixed','${cat.id}','budgeted',this.value)" />
+      </td>
+      <td class="td-num">
+        ${freq !== 'monthly'
+          ? `<span class="num fw-700" style="color:${freqColor}">${fmt(freqTotal)}</span>`
+          : `<input type="number" class="inline-input" value="${actual||''}" placeholder="0.00"
+               min="0" step="0.01" onchange="updateExpense('fixed','${cat.id}','actual',this.value)" />`
+        }
+      </td>
       <td class="td-num ${varClass}">${varStr}</td>
-      <td><div class="row-actions">
-        <button class="btn-hide" title="Hide row" onclick="toggleHideCat('${cat.id}')">👁</button>
-        <button class="btn btn-danger btn-sm" title="Remove permanently" onclick="removeExpenseCat('fixed','${cat.id}')">🗑</button>
-      </div></td>
-    </tr>`;
+      <td style="text-align:center">
+        <div class="freq-row ${freq==='weekly'?'on-weekly':''}" onclick="setFreq('${cat.id}','weekly')">
+          <div class="freq-switch"><div class="freq-track"></div><div class="freq-thumb"></div></div>
+        </div>
+      </td>
+      <td style="text-align:center">
+        <div class="freq-row ${freq==='biweekly'?'on-biweekly':''}" onclick="setFreq('${cat.id}','biweekly')">
+          <div class="freq-switch"><div class="freq-track"></div><div class="freq-thumb"></div></div>
+        </div>
+      </td>
+      <td style="text-align:center">
+        <div class="freq-row ${freq==='monthly'?'on-monthly':''}" onclick="setFreq('${cat.id}','monthly')">
+          <div class="freq-switch"><div class="freq-track"></div><div class="freq-thumb"></div></div>
+        </div>
+      </td>
+    </tr>${subRow}`;
   }).join('');
 
-  // Show hidden-count row if any are hidden
   const hiddenCount = allCats.filter(c => hidden[c.id]).length;
   if (hiddenCount > 0) {
     document.getElementById('fixedBody').innerHTML += `
-      <tr>
-        <td colspan="5" style="text-align:center;padding:0.5rem">
-          <button class="btn btn-ghost btn-sm text-dim" onclick="showHiddenManager('fixed')">
-            👁‍🗨 ${hiddenCount} hidden categor${hiddenCount > 1 ? 'ies' : 'y'} — click to manage
-          </button>
-        </td>
-      </tr>`;
+      <tr><td colspan="7" style="text-align:center;padding:0.5rem">
+        <button class="btn btn-ghost btn-sm text-dim" onclick="showHiddenManager('fixed')">
+          👁‍🗨 ${hiddenCount} hidden categor${hiddenCount > 1 ? 'ies' : 'y'} — click to manage
+        </button>
+      </td></tr>`;
   }
 
   const totalVariance = totActual - totBudget;
@@ -2489,6 +2614,23 @@ function renderFixed() {
   document.getElementById('fixedActualTotal').textContent  = fmt(totActual);
   document.getElementById('fixedVarianceTotal').innerHTML  = totalVariance !== 0
     ? `<span class="${tvClass} num">${fmtSigned(totalVariance)}</span>` : '—';
+}
+
+function toggleBiweekly(catId) { setFreq(catId, getFreq(catId) === 'monthly' ? 'biweekly' : 'monthly'); }
+
+function updateBiweekly(catId, field, value) {
+  const m = getMonth(currentMonth);
+  if (!m.biweekly) m.biweekly = {};
+  if (!m.biweekly[catId]) m.biweekly[catId] = { freq: 'biweekly', count: 2 };
+  m.biweekly[catId][field] = field === 'count' ? parseInt(value)||2 : parseFloat(value)||0;
+  const freq   = m.biweekly[catId].freq || 'biweekly';
+  const perPmt = parseFloat(m.biweekly[catId].perPayment) || 0;
+  const count  = parseFloat(m.biweekly[catId].count) || (freq === 'weekly' ? 4 : 2);
+  if (!m.fixed) m.fixed = {};
+  if (!m.fixed[catId]) m.fixed[catId] = {};
+  m.fixed[catId].actual = perPmt * count;
+  saveData(); renderFixed();
+  if (activeTab === 'home') renderHome();
 }
 
 function renderVariable() {
@@ -2515,10 +2657,9 @@ function renderVariable() {
       <td class="td-num"><input type="number" class="inline-input" value="${actual||''}" placeholder="0.00" min="0" step="0.01" onchange="updateExpense('variable','${cat.id}','actual',this.value)" /></td>
       <td class="td-num ${varClass}">${varStr}</td>
       <td class="td-num text-dim">${incPct}</td>
-      <td><div class="row-actions">
+      <td style="text-align:right">
         <button class="btn-hide" title="Hide row" onclick="toggleHideCat('${cat.id}')">👁</button>
-        <button class="btn btn-danger btn-sm" title="Remove permanently" onclick="removeExpenseCat('variable','${cat.id}')">🗑</button>
-      </div></td>
+      </td>
     </tr>`;
   }).join('');
 
@@ -2608,7 +2749,35 @@ function removeExpenseCat(type, id) {
   toast('Category removed', 'info');
 }
 
-// Shows a mini manager panel inline for hidden categories
+function showRemoveCatManager(type) {
+  // Show a panel listing all removable categories for the given type
+  const allCats = type === 'fixed' ? getAllFixedCats(true) : getAllVariableCats(true);
+  const tbody   = document.getElementById(type === 'fixed' ? 'fixedBody' : 'variableBody');
+  const cols    = type === 'fixed' ? 5 : 6;
+
+  const existing = document.getElementById('removeCatManagerRow');
+  if (existing) { existing.remove(); return; } // toggle off
+
+  const row = document.createElement('tr');
+  row.id = 'removeCatManagerRow';
+  row.innerHTML = `<td colspan="${cols}" style="padding:0.75rem;background:var(--surface2);border-radius:var(--r)">
+    <div class="flex items-center justify-between mb-2">
+      <span class="text-xs text-dim fw-700" style="text-transform:uppercase;letter-spacing:.06em">Remove Categories</span>
+      <button class="btn btn-ghost btn-sm text-dim" onclick="document.getElementById('removeCatManagerRow').remove()">Close ✕</button>
+    </div>
+    <div style="display:flex;flex-wrap:wrap;gap:0.5rem">
+      ${allCats.map(c => `
+        <div style="display:flex;align-items:center;gap:0.35rem;background:var(--surface3);border:1px solid var(--border);border-radius:6px;padding:0.3rem 0.6rem;font-size:0.82rem">
+          <span class="fw-600">${c.name}</span>
+          <button class="btn-hide" style="color:var(--red)" title="Remove permanently"
+            onclick="removeExpenseCat('${type}','${c.id}');document.getElementById('removeCatManagerRow')?.remove()">🗑 Remove</button>
+        </div>
+      `).join('')}
+    </div>
+    <p class="text-xs text-muted mt-2">Removing a built-in category hides it permanently. Your data for that category is preserved.</p>
+  </td>`;
+  tbody.insertBefore(row, tbody.firstChild);
+}
 function showHiddenManager(type) {
   const allCats = type === 'fixed' ? getAllFixedCats(true) : getAllVariableCats(true);
   const hidden  = state.hiddenCats || {};
@@ -3799,7 +3968,9 @@ function bindEvents() {
 
   // Expenses
   document.getElementById('addFixedBtn').addEventListener('click', () => openExpenseCatModal('fixed'));
+  document.getElementById('removeFixedBtn').addEventListener('click', () => showRemoveCatManager('fixed'));
   document.getElementById('addVariableBtn').addEventListener('click', () => openExpenseCatModal('variable'));
+  document.getElementById('removeVariableBtn').addEventListener('click', () => showRemoveCatManager('variable'));
   document.getElementById('expenseCatClose').addEventListener('click', () => closeModal('expenseCatModal'));
   document.getElementById('expenseCatCancel').addEventListener('click', () => closeModal('expenseCatModal'));
   document.getElementById('expenseCatSave').addEventListener('click', saveExpenseCat);
