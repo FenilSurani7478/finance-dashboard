@@ -756,6 +756,7 @@ input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; marg
       <div class="nav-tab" data-tab="expenses">      <span class="tab-icon">💳</span> Expenses</div>
       <div class="nav-tab" data-tab="debt">          <span class="tab-icon">🏔</span> Debt</div>
       <div class="nav-tab" data-tab="invest">        <span class="tab-icon">📈</span> Investments</div>
+      <div class="nav-tab" data-tab="accounts">      <span class="tab-icon">🏦</span> Accounts</div>
       <div class="nav-tab" data-tab="upcoming">      <span class="tab-icon">📅</span> Upcoming</div>
       <div class="nav-tab" data-tab="wishlist">      <span class="tab-icon">⭐</span> Wishlist</div>
     </nav>
@@ -1198,6 +1199,59 @@ input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; marg
 
     </div>
 
+    <!-- ====== ACCOUNTS TAB ====== -->
+    <div class="tab-panel" id="tab-accounts">
+
+      <!-- Summary cards -->
+      <div class="grid-4 mb-4" id="acctSummaryCards"></div>
+
+      <!-- Accounts table -->
+      <div class="section">
+        <div class="section-header">
+          <h2>🏦 Bank Accounts</h2>
+          <button class="btn btn-primary btn-sm" id="addBankAcctBtn">+ Add Account</button>
+        </div>
+        <div class="card">
+          <div class="table-wrap">
+            <table id="bankAcctTable">
+              <thead>
+                <tr>
+                  <th>Account Name</th>
+                  <th>Bank / Institution</th>
+                  <th>Type</th>
+                  <th>Currency</th>
+                  <th style="text-align:right">Balance</th>
+                  <th style="text-align:right">≈ CAD</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody id="bankAcctBody"></tbody>
+              <tfoot>
+                <tr>
+                  <td colspan="4" style="font-weight:700;color:var(--dim)">Total (CAD)</td>
+                  <td class="td-num text-dim" id="bankAcctNativeTotal">—</td>
+                  <td class="td-num text-teal fw-700" id="bankAcctCADTotal">$0</td>
+                  <td></td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- INR conversion note -->
+      <div id="acctFxNote" class="hidden">
+        <div class="card card-sm flex items-center gap-3" style="border-color:rgba(249,115,22,0.3)">
+          <span style="font-size:1.1rem">🇮🇳</span>
+          <div class="text-sm">
+            INR balances converted using rate: <span class="num fw-700 text-orange" id="acctFxRateDisplay">—</span>
+            · <a href="#" onclick="switchTab('invest');return false;" class="text-teal" style="text-decoration:none">Update rate in Investments tab →</a>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
     <!-- ====== UPCOMING TAB ====== -->
     <div class="tab-panel" id="tab-upcoming">
       <div class="section">
@@ -1492,6 +1546,72 @@ input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; marg
   </div>
 </div>
 
+<!-- Add Bank Account Modal -->
+<div class="modal-overlay" id="bankAcctModal">
+  <div class="modal" style="max-width:480px">
+    <div class="modal-header">
+      <h2 id="bankAcctModalTitle">Add Bank Account</h2>
+      <button class="btn btn-ghost btn-icon" id="bankAcctModalClose">✕</button>
+    </div>
+    <div class="grid-2 gap-3">
+      <div class="form-group" style="grid-column:1/-1">
+        <label class="form-label">Account Name</label>
+        <input type="text" class="form-input" id="bankAcctName" placeholder="e.g. TD Chequing, SBI NRE Savings…" />
+      </div>
+      <div class="form-group">
+        <label class="form-label">Bank / Institution</label>
+        <input type="text" class="form-input" id="bankAcctBank" placeholder="e.g. TD Bank, SBI, ICICI…" />
+      </div>
+      <div class="form-group">
+        <label class="form-label">Account Type</label>
+        <select class="form-select" id="bankAcctType">
+          <optgroup label="Canadian Accounts">
+            <option value="Chequing">Chequing</option>
+            <option value="Savings">Savings</option>
+            <option value="TFSA">TFSA</option>
+            <option value="RRSP">RRSP</option>
+            <option value="FHSA">FHSA</option>
+            <option value="USD Account">USD Account</option>
+          </optgroup>
+          <optgroup label="Indian Accounts">
+            <option value="NRE Savings">NRE Savings</option>
+            <option value="NRO Savings">NRO Savings</option>
+            <option value="NRE FD">NRE Fixed Deposit</option>
+            <option value="NRO FD">NRO Fixed Deposit</option>
+            <option value="PPF">PPF</option>
+            <option value="India Savings">India Savings (Resident)</option>
+          </optgroup>
+          <optgroup label="Other">
+            <option value="Credit Union">Credit Union</option>
+            <option value="Other">Other</option>
+          </optgroup>
+        </select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Currency</label>
+        <select class="form-select" id="bankAcctCurrency" onchange="updateBankAcctBalanceLabel()">
+          <option value="CAD">🇨🇦 CAD — Canadian Dollar</option>
+          <option value="USD">🇺🇸 USD — US Dollar</option>
+          <option value="INR">🇮🇳 INR — Indian Rupee</option>
+        </select>
+      </div>
+      <div class="form-group" style="grid-column:1/-1">
+        <label class="form-label" id="bankAcctBalanceLabel">Current Balance</label>
+        <input type="number" class="form-input num-input" id="bankAcctBalance" placeholder="0.00" min="0" step="0.01" />
+      </div>
+      <div class="form-group" style="grid-column:1/-1">
+        <label class="form-label">Notes (optional)</label>
+        <input type="text" class="form-input" id="bankAcctNotes" placeholder="e.g. Joint account, emergency fund…" />
+      </div>
+    </div>
+    <input type="hidden" id="bankAcctEditId" />
+    <div class="modal-actions">
+      <button class="btn btn-secondary" id="bankAcctModalCancel">Cancel</button>
+      <button class="btn btn-primary" id="bankAcctModalSave">Save</button>
+    </div>
+  </div>
+</div>
+
 <!-- Add Upcoming Expense Modal -->
 <div class="modal-overlay" id="upcomingModal">
   <div class="modal">
@@ -1691,6 +1811,7 @@ let state = {
   fxRates: {},            // { INR: { rate: 0.016, fetchedAt: '2025-01-01T...' }, USD: {...} }
   fullEmergencyFund: 0,  // current BS3 balance
   fullEFGoal: 20000,     // user-set goal ($20k–$40k range)
+  bankAccounts: [],      // [{ id, name, bank, type, currency, balance, notes }]
   allocation: [           // target allocation slices
     { id: 'ca_eq',  label: 'Canadian Equity',       pct: 30 },
     { id: 'us_eq',  label: 'US Equity',             pct: 30 },
@@ -2005,6 +2126,7 @@ function renderTab(tab) {
     case 'expenses': renderExpenses(); break;
     case 'debt':     renderDebt(); break;
     case 'invest':   renderInvest(); break;
+    case 'accounts': renderAccounts(); break;
     case 'upcoming': renderUpcoming(); break;
     case 'wishlist': renderWishlist(); break;
   }
@@ -3731,6 +3853,209 @@ function openAllocationModal() {
 }
 
 /* ============================================================
+   ACCOUNTS TAB
+   ============================================================ */
+const ACCT_TYPE_COLORS = {
+  'Chequing':      '#14b8a6',
+  'Savings':       '#22c55e',
+  'TFSA':          '#14b8a6',
+  'RRSP':          '#f97316',
+  'FHSA':          '#8b5cf6',
+  'USD Account':   '#eab308',
+  'NRE Savings':   '#f97316',
+  'NRO Savings':   '#f97316',
+  'NRE FD':        '#ea580c',
+  'NRO FD':        '#ea580c',
+  'PPF':           '#f59e0b',
+  'India Savings': '#fb923c',
+  'Credit Union':  '#64748b',
+  'Other':         '#94a3b8',
+};
+
+function acctToCAD(amount, currency) {
+  if (!currency || currency === 'CAD') return parseFloat(amount) || 0;
+  const fx = state.fxRates || {};
+  if (currency === 'INR') return (parseFloat(amount)||0) * (fx.INR?.rate || 0);
+  if (currency === 'USD') return (parseFloat(amount)||0) * (fx.USD?.rate || 1.36);
+  return parseFloat(amount) || 0;
+}
+
+function renderAccounts() {
+  renderAcctSummary();
+  renderAcctTable();
+  renderAcctFxNote();
+}
+
+function renderAcctSummary() {
+  const accts   = state.bankAccounts || [];
+  const totalCAD = accts.reduce((s,a) => s + acctToCAD(a.balance, a.currency), 0);
+  const cadAccts = accts.filter(a => !a.currency || a.currency === 'CAD');
+  const inrAccts = accts.filter(a => a.currency === 'INR');
+  const usdAccts = accts.filter(a => a.currency === 'USD');
+  const cadTotal = cadAccts.reduce((s,a) => s + (parseFloat(a.balance)||0), 0);
+  const inrTotal = inrAccts.reduce((s,a) => s + (parseFloat(a.balance)||0), 0);
+
+  document.getElementById('acctSummaryCards').innerHTML = `
+    <div class="metric-card teal">
+      <div class="metric-label">Total Net Worth (CAD)</div>
+      <div class="metric-value num text-teal">${fmt(totalCAD, 0)}</div>
+      <div class="metric-sub">${accts.length} account${accts.length !== 1 ? 's' : ''}</div>
+    </div>
+    <div class="metric-card orange">
+      <div class="metric-label">Canadian Accounts</div>
+      <div class="metric-value num">${fmt(cadTotal, 0)}</div>
+      <div class="metric-sub">${cadAccts.length} account${cadAccts.length !== 1 ? 's' : ''}</div>
+    </div>
+    <div class="metric-card ${inrTotal > 0 ? 'orange' : 'teal'}">
+      <div class="metric-label">Indian Accounts (INR)</div>
+      <div class="metric-value num" style="font-size:1.5rem">₹${inrTotal.toLocaleString('en-IN',{maximumFractionDigits:0})}</div>
+      <div class="metric-sub">${inrAccts.length} account${inrAccts.length !== 1 ? 's' : ''} · ${fmt(acctToCAD(inrTotal,'INR'),0)} CAD</div>
+    </div>
+    <div class="metric-card teal">
+      <div class="metric-label">USD Accounts</div>
+      <div class="metric-value num">US$${usdAccts.reduce((s,a)=>s+(parseFloat(a.balance)||0),0).toLocaleString('en-CA',{maximumFractionDigits:0})}</div>
+      <div class="metric-sub">${usdAccts.length} account${usdAccts.length !== 1 ? 's' : ''}</div>
+    </div>
+  `;
+}
+
+function renderAcctTable() {
+  const accts = state.bankAccounts || [];
+  const tbody = document.getElementById('bankAcctBody');
+
+  if (accts.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="7" class="no-data-msg">No accounts yet — click "+ Add Account"</td></tr>';
+    document.getElementById('bankAcctCADTotal').textContent = '$0';
+    document.getElementById('bankAcctNativeTotal').textContent = '—';
+    return;
+  }
+
+  let totalCAD = 0;
+  tbody.innerHTML = accts.map(a => {
+    const balance  = parseFloat(a.balance) || 0;
+    const currency = a.currency || 'CAD';
+    const cadVal   = acctToCAD(balance, currency);
+    totalCAD += cadVal;
+
+    const isINR = currency === 'INR';
+    const isUSD = currency === 'USD';
+    const color = ACCT_TYPE_COLORS[a.type] || '#94a3b8';
+    const hasFx = isINR ? !!(state.fxRates?.INR?.rate) : isUSD ? !!(state.fxRates?.USD?.rate) : true;
+
+    const nativeDisplay = isINR
+      ? `₹${balance.toLocaleString('en-IN',{maximumFractionDigits:0})}`
+      : isUSD
+        ? `US$${balance.toLocaleString('en-CA',{maximumFractionDigits:2,minimumFractionDigits:2})}`
+        : fmt(balance);
+
+    const cadDisplay = (isINR || isUSD)
+      ? (hasFx ? `<span class="text-teal fw-700">${fmt(cadVal,0)}</span>`
+               : `<span class="text-muted text-xs">Set rate in Investments ↗</span>`)
+      : `<span class="text-teal fw-700">${fmt(cadVal,0)}</span>`;
+
+    return `<tr>
+      <td>
+        <div class="fw-600">${a.name}</div>
+        ${a.notes ? `<div class="text-xs text-muted mt-1">${a.notes}</div>` : ''}
+      </td>
+      <td class="text-sm text-dim">${a.bank || '—'}</td>
+      <td><span class="badge" style="background:${color}22;color:${color};border:1px solid ${color}44">${a.type || '—'}</span></td>
+      <td><span class="badge badge-muted text-xs">${currency}</span></td>
+      <td class="td-num">
+        <input type="number" class="inline-input ${isINR?'text-orange':isUSD?'text-yellow':'text-teal'}"
+          value="${balance||''}" placeholder="0.00" min="0" step="0.01"
+          onchange="updateBankAcctBalance('${a.id}',this.value)" style="max-width:130px" />
+      </td>
+      <td class="td-num">${cadDisplay}</td>
+      <td style="text-align:right;white-space:nowrap">
+        <button class="btn btn-ghost btn-sm" onclick="openBankAcctModal('${a.id}')">✏️</button>
+        <button class="btn btn-danger btn-sm" onclick="deleteBankAcct('${a.id}')">🗑</button>
+      </td>
+    </tr>`;
+  }).join('');
+
+  document.getElementById('bankAcctCADTotal').textContent  = fmt(totalCAD, 0);
+  document.getElementById('bankAcctNativeTotal').textContent = '—';
+}
+
+function renderAcctFxNote() {
+  const hasINR = (state.bankAccounts||[]).some(a => a.currency === 'INR');
+  const note   = document.getElementById('acctFxNote');
+  const disp   = document.getElementById('acctFxRateDisplay');
+  if (!note) return;
+  if (hasINR) {
+    note.classList.remove('hidden');
+    const fx = state.fxRates?.INR;
+    if (fx?.rate && disp) {
+      disp.textContent = `₹1 = $${fx.rate.toFixed(5)} CAD  ·  $1 CAD = ₹${(1/fx.rate).toFixed(2)}`;
+    } else if (disp) {
+      disp.textContent = 'Not fetched yet';
+    }
+  } else {
+    note.classList.add('hidden');
+  }
+}
+
+function updateBankAcctBalance(id, val) {
+  const a = (state.bankAccounts||[]).find(x => x.id === id);
+  if (a) { a.balance = parseFloat(val) || 0; saveData(); renderAcctSummary(); renderAcctFxNote(); }
+}
+
+function updateBankAcctBalanceLabel() {
+  const cur = document.getElementById('bankAcctCurrency')?.value || 'CAD';
+  const lbl = document.getElementById('bankAcctBalanceLabel');
+  if (lbl) lbl.textContent = cur === 'INR' ? 'Current Balance (₹ Rupees)'
+                           : cur === 'USD' ? 'Current Balance (US$)'
+                           : 'Current Balance (CAD $)';
+}
+
+let editingBankAcctId = null;
+function openBankAcctModal(id) {
+  editingBankAcctId = id || null;
+  const a = id ? (state.bankAccounts||[]).find(x => x.id === id) : null;
+  document.getElementById('bankAcctModalTitle').textContent = a ? 'Edit Account' : 'Add Bank Account';
+  document.getElementById('bankAcctName').value     = a?.name     || '';
+  document.getElementById('bankAcctBank').value     = a?.bank     || '';
+  document.getElementById('bankAcctType').value     = a?.type     || 'Chequing';
+  document.getElementById('bankAcctCurrency').value = a?.currency || 'CAD';
+  document.getElementById('bankAcctBalance').value  = a?.balance  || '';
+  document.getElementById('bankAcctNotes').value    = a?.notes    || '';
+  document.getElementById('bankAcctEditId').value   = id || '';
+  updateBankAcctBalanceLabel();
+  document.getElementById('bankAcctModal').classList.add('open');
+  document.getElementById('bankAcctName').focus();
+}
+
+function saveBankAcct() {
+  const name = document.getElementById('bankAcctName').value.trim();
+  if (!name) { toast('Enter an account name', 'error'); return; }
+  const entry = {
+    id:       editingBankAcctId || uid(),
+    name,
+    bank:     document.getElementById('bankAcctBank').value.trim(),
+    type:     document.getElementById('bankAcctType').value,
+    currency: document.getElementById('bankAcctCurrency').value,
+    balance:  parseFloat(document.getElementById('bankAcctBalance').value) || 0,
+    notes:    document.getElementById('bankAcctNotes').value.trim(),
+  };
+  if (!state.bankAccounts) state.bankAccounts = [];
+  if (editingBankAcctId) {
+    const idx = state.bankAccounts.findIndex(x => x.id === editingBankAcctId);
+    if (idx >= 0) state.bankAccounts[idx] = entry;
+  } else {
+    state.bankAccounts.push(entry);
+  }
+  closeModal('bankAcctModal');
+  saveData(); renderAccounts();
+  toast('Account saved', 'success');
+}
+
+function deleteBankAcct(id) {
+  state.bankAccounts = (state.bankAccounts||[]).filter(x => x.id !== id);
+  saveData(); renderAccounts();
+}
+
+/* ============================================================
    UPCOMING TAB
    ============================================================ */
 const PRIORITY_BADGE = { High: 'badge-red', Medium: 'badge-yellow', Low: 'badge-teal' };
@@ -4021,6 +4346,12 @@ function bindEvents() {
     saveData(); closeModal('allocationModal'); renderAllocationCard(); renderInvestTrend();
     toast('Allocation saved', 'success');
   });
+
+  // Bank Accounts
+  document.getElementById('addBankAcctBtn').addEventListener('click', () => openBankAcctModal(null));
+  document.getElementById('bankAcctModalClose').addEventListener('click', () => closeModal('bankAcctModal'));
+  document.getElementById('bankAcctModalCancel').addEventListener('click', () => closeModal('bankAcctModal'));
+  document.getElementById('bankAcctModalSave').addEventListener('click', saveBankAcct);
 
   // Upcoming
   document.getElementById('addUpcomingBtn').addEventListener('click', () => openUpcomingModal(null));
