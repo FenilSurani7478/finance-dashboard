@@ -6,6 +6,87 @@
 <title>FinanceOS</title>
 <style>
 /* ============================================================
+   LOCK SCREEN
+   ============================================================ */
+#lockScreen {
+  position: fixed; inset: 0; z-index: 9999;
+  background: var(--bg);
+  display: flex; align-items: center; justify-content: center;
+  flex-direction: column;
+  background-image:
+    linear-gradient(rgba(20,184,166,0.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(20,184,166,0.03) 1px, transparent 1px);
+  background-size: 40px 40px;
+}
+.lock-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 2.5rem 2rem;
+  width: 100%; max-width: 380px;
+  text-align: center;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+}
+.lock-icon { font-size: 2.5rem; margin-bottom: 1rem; }
+.lock-title { font-size: 1.3rem; font-weight: 800; margin-bottom: 0.3rem; }
+.lock-subtitle { font-size: 0.85rem; color: var(--dim); margin-bottom: 1.75rem; }
+
+/* 6-digit OTP input boxes */
+.otp-row {
+  display: flex; gap: 0.5rem; justify-content: center;
+  margin-bottom: 1.25rem;
+}
+.otp-box {
+  width: 46px; height: 58px;
+  background: var(--surface2);
+  border: 2px solid var(--border);
+  border-radius: 10px;
+  font-family: var(--num);
+  font-size: 1.6rem; font-weight: 700;
+  text-align: center; color: var(--text);
+  outline: none;
+  transition: border-color 0.15s, background 0.15s;
+  caret-color: var(--orange);
+}
+.otp-box:focus { border-color: var(--orange); background: var(--surface3); }
+.otp-box.filled { border-color: var(--teal); }
+.otp-box.error  { border-color: var(--red); background: var(--red-g); animation: shake 0.4s; }
+
+@keyframes shake {
+  0%,100%{transform:translateX(0)}
+  20%,60%{transform:translateX(-6px)}
+  40%,80%{transform:translateX(6px)}
+}
+
+.lock-timer {
+  font-size: 0.75rem; color: var(--dim);
+  margin-bottom: 1rem; font-family: var(--num);
+}
+.lock-timer span { color: var(--orange); font-weight: 700; }
+
+/* Setup screen */
+.secret-display {
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  padding: 0.75rem 1rem;
+  font-family: var(--num);
+  font-size: 1rem; font-weight: 700;
+  letter-spacing: 0.15em;
+  color: var(--teal);
+  word-break: break-all;
+  margin: 1rem 0;
+}
+.setup-steps {
+  text-align: left;
+  font-size: 0.82rem;
+  color: var(--dim);
+  line-height: 1.7;
+  margin: 1rem 0;
+}
+.setup-steps li { margin-bottom: 0.3rem; }
+
+/* ============================================================
    CSS VARIABLES & RESET
    ============================================================ */
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -719,6 +800,52 @@ input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; marg
 </style>
 </head>
 <body>
+
+<!-- ============================================================
+     LOCK SCREEN — shown before app loads
+     ============================================================ -->
+<div id="lockScreen">
+  <!-- Setup view (first time) -->
+  <div class="lock-card" id="setupView" style="display:none">
+    <div class="lock-icon">🔐</div>
+    <div class="lock-title">Set Up Authenticator</div>
+    <div class="lock-subtitle">Scan this key in Google Authenticator to protect your dashboard.</div>
+    <ol class="setup-steps">
+      <li>Open <strong>Google Authenticator</strong> on your phone</li>
+      <li>Tap <strong>+</strong> → <strong>Enter a setup key</strong></li>
+      <li>Account name: <strong>FinanceOS</strong></li>
+      <li>Copy and paste this key:</li>
+    </ol>
+    <div class="secret-display" id="setupSecretDisplay"></div>
+    <p style="font-size:0.75rem;color:var(--muted);margin-bottom:1.25rem">
+      ⚠️ Save this key somewhere safe. If you lose it, you'll need to reset the app.
+    </p>
+    <button class="btn btn-primary w-full" id="setupDoneBtn" style="width:100%">
+      I've added it — Continue to Dashboard
+    </button>
+  </div>
+
+  <!-- Auth view (every visit) -->
+  <div class="lock-card" id="authView" style="display:none">
+    <div class="lock-icon">🔒</div>
+    <div class="lock-title">FinanceOS</div>
+    <div class="lock-subtitle">Enter the 6-digit code from your Authenticator app</div>
+    <div class="otp-row" id="otpRow">
+      <input class="otp-box" maxlength="1" inputmode="numeric" pattern="[0-9]" data-idx="0" />
+      <input class="otp-box" maxlength="1" inputmode="numeric" pattern="[0-9]" data-idx="1" />
+      <input class="otp-box" maxlength="1" inputmode="numeric" pattern="[0-9]" data-idx="2" />
+      <input class="otp-box" maxlength="1" inputmode="numeric" pattern="[0-9]" data-idx="3" />
+      <input class="otp-box" maxlength="1" inputmode="numeric" pattern="[0-9]" data-idx="4" />
+      <input class="otp-box" maxlength="1" inputmode="numeric" pattern="[0-9]" data-idx="5" />
+    </div>
+    <div class="lock-timer">Code refreshes in <span id="lockTimerDisplay">30</span>s</div>
+    <div id="lockError" style="color:var(--red);font-size:0.82rem;min-height:1.2em;margin-bottom:0.75rem"></div>
+    <button class="btn btn-primary w-full" id="unlockBtn" style="width:100%">Unlock</button>
+    <button class="btn btn-ghost btn-sm mt-2" id="resetAuthBtn" style="width:100%;margin-top:0.5rem;color:var(--muted)">
+      Reset authenticator (lost access)
+    </button>
+  </div>
+</div>
 <div id="app">
 
   <!-- ============================================================
@@ -739,6 +866,7 @@ input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; marg
       </div>
 
       <div class="header-actions">
+        <span id="autoSaveStatus" style="font-size:0.72rem;color:var(--muted);align-self:center;white-space:nowrap"></span>
         <button class="drive-status" id="driveBtn" title="Google Drive Sync">
           <div class="drive-dot" id="driveDot"></div>
           <span id="driveBtnLabel">Drive</span>
@@ -792,6 +920,21 @@ input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; marg
         <div class="card">
           <div class="card-header"><h3>📉 6-Month Trends</h3></div>
           <div id="trendSparklines"></div>
+        </div>
+      </div>
+
+      <!-- Interest Tracking -->
+      <div class="grid-2 gap-4 mb-4">
+        <div class="card">
+          <div class="card-header">
+            <h3>💸 Interest Cost Tracker</h3>
+            <span class="badge badge-red" id="interestBadge"></span>
+          </div>
+          <div id="interestTracking"></div>
+        </div>
+        <div class="card">
+          <div class="card-header"><h3>🎯 Surplus → Debt Snowball</h3></div>
+          <div id="surplusDebt"></div>
         </div>
       </div>
     </div>
@@ -867,6 +1010,15 @@ input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; marg
           </div>
         </div>
       </div>
+
+      <!-- Receivables (auto-populated from Splitwise positive balances) -->
+      <div class="section" id="receivablesSection">
+        <div class="section-header">
+          <h2>📥 Receivables — Money Owed to You</h2>
+        </div>
+        <div id="receivablesContent"></div>
+      </div>
+
     </div>
 
     <!-- ====== EXPENSES TAB ====== -->
@@ -982,6 +1134,11 @@ input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; marg
         </div>
       </div>
 
+
+      <!-- Splitwise Owed (auto-populated from negative Splitwise balances) -->
+      <div class="section" id="splitwiseDebtSection">
+        <div id="splitwiseDebtContent"></div>
+      </div>
 
       <!-- Debt Snowball Table -->
       <div class="section">
@@ -1454,7 +1611,15 @@ input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; marg
           <input type="number" class="form-input num-input" id="debtRate" placeholder="0.00" min="0" step="0.01" />
         </div>
         <div class="form-group">
-          <label class="form-label">Minimum Payment ($)</label>
+          <label class="form-label">Payment Frequency</label>
+          <select class="form-select" id="debtFreq">
+            <option value="monthly">Monthly</option>
+            <option value="biweekly">Bi-weekly (every 2 weeks)</option>
+            <option value="weekly">Weekly</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label" id="debtMinLabel">Minimum Payment per Occurrence ($)</label>
           <input type="number" class="form-input num-input" id="debtMin" placeholder="0.00" min="0" step="0.01" />
         </div>
       </div>
@@ -1476,10 +1641,6 @@ input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; marg
       <button class="btn btn-ghost btn-icon" id="investAccountModalClose">✕</button>
     </div>
     <div class="grid-2 gap-3">
-      <div class="form-group" style="grid-column:1/-1">
-        <label class="form-label">Account Name</label>
-        <input type="text" class="form-input" id="investAccName" placeholder="e.g. TFSA – Questrade" />
-      </div>
       <div class="form-group">
         <label class="form-label">Account Type</label>
         <select class="form-select" id="investAccType">
@@ -1519,6 +1680,19 @@ input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; marg
       </div>
     </div>
     <input type="hidden" id="investAccEditId" />
+
+    <!-- Optional nickname -->
+    <div class="mt-3" id="investNicknameWrap" style="display:none">
+      <div class="form-group mb-0">
+        <label class="form-label">Nickname (optional)</label>
+        <input type="text" class="form-input" id="investAccNickname"
+          placeholder="e.g. Emergency Fund, Indian Savings…" />
+        <p class="text-xs text-muted mt-1">Overrides the auto-generated name in the table.</p>
+      </div>
+    </div>
+    <button type="button" class="btn btn-ghost btn-sm mt-2 text-teal" id="investNicknameBtn"
+      onclick="toggleInvestNickname()">+ Add Nickname</button>
+
     <div class="modal-actions">
       <button class="btn btn-secondary" id="investAccountModalCancel">Cancel</button>
       <button class="btn btn-primary" id="investAccountModalSave">Save</button>
@@ -1554,10 +1728,6 @@ input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; marg
       <button class="btn btn-ghost btn-icon" id="bankAcctModalClose">✕</button>
     </div>
     <div class="grid-2 gap-3">
-      <div class="form-group" style="grid-column:1/-1">
-        <label class="form-label">Account Name</label>
-        <input type="text" class="form-input" id="bankAcctName" placeholder="e.g. TD Chequing, SBI NRE Savings…" />
-      </div>
       <div class="form-group">
         <label class="form-label">Bank / Institution</label>
         <input type="text" class="form-input" id="bankAcctBank" placeholder="e.g. TD Bank, SBI, ICICI…" />
@@ -1582,6 +1752,7 @@ input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; marg
             <option value="India Savings">India Savings (Resident)</option>
           </optgroup>
           <optgroup label="Other">
+            <option value="Splitwise">Splitwise</option>
             <option value="Credit Union">Credit Union</option>
             <option value="Other">Other</option>
           </optgroup>
@@ -1605,6 +1776,19 @@ input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; marg
       </div>
     </div>
     <input type="hidden" id="bankAcctEditId" />
+
+    <!-- Optional nickname -->
+    <div class="mt-3" id="bankNicknameWrap" style="display:none">
+      <div class="form-group mb-0">
+        <label class="form-label">Nickname (optional)</label>
+        <input type="text" class="form-input" id="bankAcctNickname"
+          placeholder="e.g. Emergency Fund, Indian Savings…" />
+        <p class="text-xs text-muted mt-1">Overrides the auto-generated name in the table.</p>
+      </div>
+    </div>
+    <button type="button" class="btn btn-ghost btn-sm mt-2 text-teal" id="bankNicknameBtn"
+      onclick="toggleBankNickname()">+ Add Nickname</button>
+
     <div class="modal-actions">
       <button class="btn btn-secondary" id="bankAcctModalCancel">Cancel</button>
       <button class="btn btn-primary" id="bankAcctModalSave">Save</button>
@@ -1812,6 +1996,7 @@ let state = {
   fullEmergencyFund: 0,  // current BS3 balance
   fullEFGoal: 20000,     // user-set goal ($20k–$40k range)
   bankAccounts: [],      // [{ id, name, bank, type, currency, balance, notes }]
+  budgetDefaults: {},   // { 'fixed:catId': amount, 'variable:catId': amount } — carries forward to all months
   allocation: [           // target allocation slices
     { id: 'ca_eq',  label: 'Canadian Equity',       pct: 30 },
     { id: 'us_eq',  label: 'US Equity',             pct: 30 },
@@ -1894,8 +2079,66 @@ function emptyMonth() {
 function saveData() {
   try {
     localStorage.setItem('financeos_v2', JSON.stringify(state));
+    scheduleAutoSave(); // queue a Drive sync after data changes
   } catch(e) { console.warn('localStorage save failed', e); }
 }
+
+/* ============================================================
+   AUTO-SAVE TO DRIVE
+   Marks data as dirty on every change.
+   Saves to Drive when the tab is closed or switched away from.
+   ============================================================ */
+let pendingDriveSave = false;
+
+function scheduleAutoSave() {
+  if (!driveToken) return;
+  // Just mark as dirty — actual save happens on tab close
+  pendingDriveSave = true;
+  setAutoSaveStatus('pending');
+}
+
+async function silentDriveSave() {
+  if (!driveToken || !pendingDriveSave) return;
+  setAutoSaveStatus('saving');
+  try {
+    await driveSave();
+    pendingDriveSave = false;
+    setAutoSaveStatus('saved');
+    setTimeout(() => setAutoSaveStatus(''), 4000);
+  } catch(e) {
+    setAutoSaveStatus('failed');
+  }
+}
+
+function setAutoSaveStatus(status) {
+  const el = document.getElementById('autoSaveStatus');
+  if (!el) return;
+  const map = {
+    pending: '● Unsaved changes',
+    saving:  '↑ Saving to Drive…',
+    saved:   '✓ Saved to Drive',
+    failed:  '⚠ Drive save failed — retry manually',
+    '':      '',
+  };
+  el.textContent = map[status] || '';
+  el.style.color = status === 'saved'   ? 'var(--green)'
+                 : status === 'pending' ? 'var(--yellow)'
+                 : status === 'saving'  ? 'var(--teal)'
+                 : status === 'failed'  ? 'var(--red)'
+                 : 'var(--muted)';
+}
+
+// Save to Drive when tab is hidden (user switches tabs, minimises, or closes)
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'hidden' && driveToken && pendingDriveSave) {
+    silentDriveSave();
+  }
+});
+
+// Fallback: pagehide fires on mobile and some browsers when tab is closed
+window.addEventListener('pagehide', () => {
+  if (driveToken && pendingDriveSave) silentDriveSave();
+});
 
 function loadData() {
   try {
@@ -2182,7 +2425,7 @@ function calcMonthTotals(ym) {
   let fixedBudget = 0, fixedActual = 0;
   const allFixed = getAllFixedCats();
   for (const cat of allFixed) {
-    fixedBudget  += parseFloat(m.fixed?.[cat.id]?.budgeted) || parseFloat(cat.budgeted) || 0;
+    fixedBudget  += getBudgeted('fixed', cat.id, m, cat.budgeted);
     fixedActual  += parseFloat(m.fixed?.[cat.id]?.actual)   || 0;
   }
 
@@ -2190,7 +2433,7 @@ function calcMonthTotals(ym) {
   let varBudget = 0, varActual = 0;
   const allVar = getAllVariableCats();
   for (const cat of allVar) {
-    varBudget  += parseFloat(m.variable?.[cat.id]?.budgeted) || parseFloat(cat.budgeted) || 0;
+    varBudget  += getBudgeted('variable', cat.id, m, cat.budgeted);
     varActual  += parseFloat(m.variable?.[cat.id]?.actual)   || 0;
   }
 
@@ -2314,7 +2557,9 @@ function renderHome() {
   const overItems = [];
   for (const cat of [...getAllFixedCats(), ...getAllVariableCats()]) {
     const data = m.fixed?.[cat.id] || m.variable?.[cat.id] || {};
-    const budgeted = parseFloat(data.budgeted) || parseFloat(cat.budgeted) || 0;
+    const budgeted = parseFloat(data.budgeted) || getBudgeted(
+      getAllFixedCats(true).some(c=>c.id===cat.id) ? 'fixed' : 'variable', cat.id, m, cat.budgeted
+    );
     const actual   = parseFloat(data.actual) || 0;
     if (budgeted > 0 && actual > budgeted) {
       overItems.push({ name: cat.name, budgeted, actual, overage: actual - budgeted });
@@ -2422,14 +2667,258 @@ function renderHome() {
       </div>
     </div>
   `;
+
+  renderInterestTracking(ym, t);
+  renderSurplusDebt(t);
 }
 
 /* ============================================================
-   INCOME TAB
+   INTEREST TRACKING + SURPLUS→DEBT (Overview)
    ============================================================ */
+function calcDebtInterestMonth(debt, ym) {
+  const balance = parseFloat(debt.balance) || 0;
+  const rate    = parseFloat(debt.rate) || 0;
+  if (!balance || !rate) return { interest: 0, principal: 0, payments: 0, total: 0 };
+
+  const freq   = debt.payFreq || 'monthly';
+  const pmtsPerYear = freq === 'biweekly' ? 26 : freq === 'weekly' ? 52 : 12;
+  const ratePerPmt  = (rate / 100) / pmtsPerYear;
+  const interestPmt = balance * ratePerPmt;
+  const minimum     = parseFloat(debt.minimum) || 0;
+  const principalPmt= Math.max(0, minimum - interestPmt);
+
+  // Number of payments this month
+  const m = getMonth(ym);
+  let count = 1;
+  if (freq === 'biweekly') count = m.biweekly?.['car_payment']?.count || 2;
+  else if (freq === 'weekly') count = m.biweekly?.['car_payment']?.count || 4;
+
+  return {
+    interest:  interestPmt * count,
+    principal: principalPmt * count,
+    payments:  count,
+    total:     minimum * count,
+    perPayment: interestPmt,
+    freq,
+  };
+}
+
+function renderInterestTracking(ym, t) {
+  const loans = state.debts.filter(d => d.type !== 'credit_card' && (parseFloat(d.balance)||0) > 0 && (parseFloat(d.rate)||0) > 0);
+  const cards = state.debts.filter(d => d.type === 'credit_card' && (parseFloat(d.balance)||0) > 0 && (parseFloat(d.rate)||0) > 0);
+  const allDebts = [...loans, ...cards];
+
+  if (allDebts.length === 0) {
+    document.getElementById('interestTracking').innerHTML = '<div class="no-data-msg">No active debts with interest rates set.</div>';
+    document.getElementById('interestBadge').textContent = '';
+    return;
+  }
+
+  // This month's interest across all debts
+  let totalInterestMonth = 0;
+  const rows = allDebts.map(d => {
+    const calc = calcDebtInterestMonth(d, ym);
+    totalInterestMonth += calc.interest;
+    const isCC = d.type === 'credit_card';
+    const freqLabel = isCC ? 'monthly' : (d.payFreq || 'monthly');
+    return { debt: d, calc, freqLabel };
+  });
+
+  // YTD interest (current year)
+  const year = ym.split('-')[0];
+  let ytdInterest = 0;
+  for (let mo = 1; mo <= parseInt(ym.split('-')[1]); mo++) {
+    const monthKey = `${year}-${String(mo).padStart(2,'0')}`;
+    allDebts.forEach(d => {
+      ytdInterest += calcDebtInterestMonth(d, monthKey).interest;
+    });
+  }
+
+  // Projected full year (based on current balances — approximate)
+  const projectedYear = totalInterestMonth * 12;
+
+  // Total interest remaining over life of all loans (approximate)
+  const totalRemaining = allDebts.reduce((s, d) => {
+    const bal = parseFloat(d.balance) || 0;
+    const rate = parseFloat(d.rate) || 0;
+    const min = parseFloat(d.minimum) || 0;
+    if (!bal || !rate || !min) return s;
+    const freq = d.payFreq || 'monthly';
+    const pmtsPerYear = freq === 'biweekly' ? 26 : freq === 'weekly' ? 52 : 12;
+    const r = (rate/100) / pmtsPerYear;
+    if (min <= bal * r) return s; // won't pay off
+    const n = Math.ceil(-Math.log(1 - (bal*r)/min) / Math.log(1+r));
+    return s + (min * n - bal);
+  }, 0);
+
+  document.getElementById('interestBadge').textContent = fmt(totalInterestMonth, 0) + '/mo';
+
+  document.getElementById('interestTracking').innerHTML = `
+    <!-- Summary row -->
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:0.6rem;margin-bottom:1rem">
+      <div style="background:var(--surface2);border:1px solid var(--border);border-radius:var(--r);padding:0.6rem 0.75rem">
+        <div class="text-xs text-dim fw-700 mb-1" style="text-transform:uppercase;letter-spacing:.05em">This Month</div>
+        <div class="num fw-700 text-red">${fmt(totalInterestMonth)}</div>
+        <div class="text-xs text-muted mt-1">interest only</div>
+      </div>
+      <div style="background:var(--surface2);border:1px solid var(--border);border-radius:var(--r);padding:0.6rem 0.75rem">
+        <div class="text-xs text-dim fw-700 mb-1" style="text-transform:uppercase;letter-spacing:.05em">YTD ${year}</div>
+        <div class="num fw-700 text-red">${fmt(ytdInterest)}</div>
+        <div class="text-xs text-muted mt-1">paid in interest</div>
+      </div>
+      <div style="background:var(--surface2);border:1px solid var(--border);border-radius:var(--r);padding:0.6rem 0.75rem">
+        <div class="text-xs text-dim fw-700 mb-1" style="text-transform:uppercase;letter-spacing:.05em">If Only Minimums</div>
+        <div class="num fw-700 text-red">${fmt(totalRemaining, 0)}</div>
+        <div class="text-xs text-muted mt-1">total interest remaining</div>
+      </div>
+    </div>
+
+    <!-- Per-debt breakdown -->
+    ${rows.map(({ debt: d, calc }) => `
+      <div class="mom-row">
+        <div>
+          <div class="text-sm fw-600">${d.name}</div>
+          <div class="text-xs text-muted">${d.rate}% · ${calc.payments} pmt${calc.payments>1?'s':''}/mo · ${fmt(calc.perPayment)} interest each</div>
+        </div>
+        <div style="text-align:right">
+          <div class="num fw-700 text-red text-sm">${fmt(calc.interest)}</div>
+          <div class="text-xs text-green">${fmt(calc.principal)} to principal</div>
+        </div>
+      </div>
+    `).join('')}
+
+    <div class="mt-2 pt-2" style="border-top:1px solid var(--border2)">
+      <div class="text-xs text-dim">Projected full-year interest at current balances: <span class="num fw-700 text-red">${fmt(projectedYear, 0)}</span></div>
+    </div>
+  `;
+}
+
+function renderSurplusDebt(t) {
+  const surplus = t.net;
+  const snowballTarget = [...state.debts]
+    .filter(d => (parseFloat(d.balance)||0) > 0)
+    .sort((a,b) => (parseFloat(a.balance)||0) - (parseFloat(b.balance)||0))[0];
+
+  const el = document.getElementById('surplusDebt');
+  if (!el) return;
+
+  if (surplus <= 0) {
+    el.innerHTML = `
+      <div class="analysis-item">
+        <div class="analysis-icon red">⚠️</div>
+        <div class="analysis-body">
+          <div class="analysis-title">Deficit this month</div>
+          <div class="analysis-detail">You're ${fmt(Math.abs(surplus))} over budget. Focus on reducing variable expenses before adding debt payments.</div>
+        </div>
+      </div>`;
+    return;
+  }
+
+  const tip = surplus < 50
+    ? 'Every dollar helps — even small amounts reduce your interest costs immediately.'
+    : 'Pay it toward your snowball target <strong>now</strong>, not next month. Every month you wait costs you interest on this amount.';
+
+  el.innerHTML = `
+    <div class="analysis-item">
+      <div class="analysis-icon green">💰</div>
+      <div class="analysis-body">
+        <div class="analysis-title">You have <span class="text-green num fw-700">${fmt(surplus)}</span> surplus this month</div>
+        <div class="analysis-detail mt-1">${tip}</div>
+      </div>
+    </div>
+    ${snowballTarget ? `
+    <div class="analysis-item mt-2">
+      <div class="analysis-icon orange">🎯</div>
+      <div class="analysis-body">
+        <div class="analysis-title">Snowball target: <span class="text-orange fw-700">${snowballTarget.name}</span></div>
+        <div class="analysis-detail">
+          Balance ${fmt(snowballTarget.balance, 0)} ·
+          Paying <span class="text-green fw-700">${fmt(surplus)}</span> extra →
+          new balance <span class="text-teal fw-700 num">${fmt(Math.max(0,(parseFloat(snowballTarget.balance)||0) - surplus), 0)}</span>
+          ${surplus >= (parseFloat(snowballTarget.balance)||0) ? '<span class="badge badge-green ml-1">🎉 Paid off!</span>' : ''}
+        </div>
+      </div>
+    </div>` : ''}
+    <div class="mt-3 p-2 rounded text-xs text-dim" style="background:var(--surface2);border-radius:var(--r)">
+      💡 <strong>Dave Ramsey rule:</strong> Don't save up surplus to pay a bigger lump sum next month.
+      Pay it <em>immediately</em> — every day your debt sits at a higher balance, you're paying more interest.
+    </div>
+  `;
+}
+/* ============================================================
+   SPLITWISE — AUTO-ROUTES BASED ON BALANCE SIGN
+   ============================================================ */
+function getSplitAccounts() {
+  return (state.bankAccounts || []).filter(a => a.type === 'Splitwise');
+}
+
+function renderReceivables() {
+  const positive = getSplitAccounts().filter(a => (parseFloat(a.balance)||0) > 0);
+  const el      = document.getElementById('receivablesContent');
+  const section = document.getElementById('receivablesSection');
+  if (!el) return;
+  if (positive.length === 0) { section.style.display = 'none'; return; }
+  section.style.display = '';
+  const total = positive.reduce((s, a) => s + (parseFloat(a.balance)||0), 0);
+  el.innerHTML = `
+    <div class="card">
+      <p class="text-xs text-muted mb-3">
+        These amounts are owed <strong>to you</strong> from Splitwise.
+        Update the balance in the <a href="#" onclick="switchTab('accounts');return false;" class="text-teal" style="text-decoration:none">Accounts tab</a> each month.
+      </p>
+      <div class="table-wrap"><table>
+        <thead><tr><th>Account</th><th>Notes</th><th style="text-align:right">Owed to You</th></tr></thead>
+        <tbody>${positive.map(a => `
+          <tr>
+            <td><span class="fw-600">${a.name}</span> <span class="badge badge-green" style="margin-left:.35rem">Receivable</span></td>
+            <td class="text-sm text-dim">${a.notes||'—'}</td>
+            <td class="td-num text-green fw-700">${fmt(Math.abs(parseFloat(a.balance)||0))}</td>
+          </tr>`).join('')}
+        </tbody>
+        <tfoot><tr>
+          <td colspan="2" style="font-weight:700;color:var(--dim)">Total Receivable</td>
+          <td class="td-num text-green fw-700">${fmt(total)}</td>
+        </tr></tfoot>
+      </table></div>
+    </div>`;
+}
+
+function renderSplitweDebt() {
+  const negative = getSplitAccounts().filter(a => (parseFloat(a.balance)||0) < 0);
+  const el      = document.getElementById('splitwiseDebtContent');
+  const section = document.getElementById('splitwiseDebtSection');
+  if (!el) return;
+  if (negative.length === 0) { section.style.display = 'none'; return; }
+  section.style.display = '';
+  const total = negative.reduce((s, a) => s + Math.abs(parseFloat(a.balance)||0), 0);
+  el.innerHTML = `
+    <div class="section-header"><h2>💳 Splitwise — You Owe</h2></div>
+    <div class="card" style="border-color:rgba(244,63,94,0.3)">
+      <p class="text-xs text-muted mb-3">
+        Amounts you owe others on Splitwise. Enter as a <strong>negative balance</strong> (e.g. −45) in the
+        <a href="#" onclick="switchTab('accounts');return false;" class="text-teal" style="text-decoration:none">Accounts tab</a>.
+      </p>
+      <div class="table-wrap"><table>
+        <thead><tr><th>Account</th><th>Notes</th><th style="text-align:right">You Owe</th></tr></thead>
+        <tbody>${negative.map(a => `
+          <tr>
+            <td><span class="fw-600">${a.name}</span> <span class="badge badge-red" style="margin-left:.35rem">You Owe</span></td>
+            <td class="text-sm text-dim">${a.notes||'—'}</td>
+            <td class="td-num text-red fw-700">${fmt(Math.abs(parseFloat(a.balance)||0))}</td>
+          </tr>`).join('')}
+        </tbody>
+        <tfoot><tr>
+          <td colspan="2" style="font-weight:700;color:var(--dim)">Total Owed</td>
+          <td class="td-num text-red fw-700">${fmt(total)}</td>
+        </tr></tfoot>
+      </table></div>
+    </div>`;
+}
+
 function renderIncome() {
   renderOBN();
   renderGig();
+  renderReceivables();
 }
 
 // ---- OBN Paychecks ----
@@ -2657,7 +3146,7 @@ function renderFixed() {
     const count    = parseFloat(bw.count) || defCount;
     const freqTotal = perPmt * count;
 
-    const budgeted = parseFloat(d.budgeted ?? cat.budgeted) || 0;
+    const budgeted = getBudgeted('fixed', cat.id, m, cat.budgeted);
     const actual   = freq !== 'monthly' ? freqTotal : (parseFloat(d.actual) || 0);
     const variance = actual - budgeted;
     totBudget += budgeted; totActual += actual;
@@ -2765,7 +3254,7 @@ function renderVariable() {
 
   document.getElementById('variableBody').innerHTML = cats.map(cat => {
     const d = m.variable?.[cat.id] || {};
-    const budgeted = parseFloat(d.budgeted ?? cat.budgeted) || 0;
+    const budgeted = getBudgeted('variable', cat.id, m, cat.budgeted);
     const actual   = parseFloat(d.actual) || 0;
     const variance = actual - budgeted;
     const incPct   = t.totalIncome > 0 ? ((actual / t.totalIncome) * 100).toFixed(1) + '%' : '—';
@@ -2810,13 +3299,29 @@ function updateExpense(type, catId, field, value) {
   if (!m[type]) m[type] = {};
   if (!m[type][catId]) m[type][catId] = {};
   m[type][catId][field] = parseFloat(value) || 0;
+
+  // When a budgeted amount is set, save it as the carry-forward default
+  // so all future months with no budgeted value yet pick it up automatically
+  if (field === 'budgeted') {
+    if (!state.budgetDefaults) state.budgetDefaults = {};
+    state.budgetDefaults[type + ':' + catId] = parseFloat(value) || 0;
+  }
+
   saveData();
   if (type === 'fixed') renderFixed();
   else renderVariable();
   if (activeTab === 'home') renderHome();
 }
 
-// expenseTypeBeingAdded is set before opening modal
+// Returns the budgeted amount for a category in a given month.
+// Priority: 1) this month's saved value  2) carry-forward default  3) cat config default
+function getBudgeted(type, catId, monthData, catDefault) {
+  const monthVal = parseFloat(monthData?.[type]?.[catId]?.budgeted);
+  if (!isNaN(monthVal) && monthVal > 0) return monthVal;
+  const carried = parseFloat(state.budgetDefaults?.[type + ':' + catId]);
+  if (!isNaN(carried) && carried > 0) return carried;
+  return parseFloat(catDefault) || 0;
+}
 let expenseTypeBeingAdded = 'variable';
 function openExpenseCatModal(type) {
   expenseTypeBeingAdded = type;
@@ -2938,6 +3443,7 @@ function showHiddenManager(type) {
 function renderDebt() {
   renderBabySteps();
   renderEmergencyFund();
+  renderSplitweDebt();
   renderDebtTable();
 }
 
@@ -3060,16 +3566,67 @@ function renderDebtTable() {
         </td>
       </tr>`;
     } else {
-      const original = parseFloat(d.original) || 0;
+      const original  = parseFloat(d.original) || 0;
+      const payFreq   = d.payFreq || 'monthly';
       totOrig += original; totBal += balance;
       const payoffDate = calcPayoffDate(balance, d.rate, minimum, extra);
       const progress   = original > 0 ? Math.max(0, Math.min(100, (1 - balance/original) * 100)) : 0;
+
+      // Amortization breakdown
+      const freqLabel  = payFreq === 'biweekly' ? 'bi-weekly' : payFreq === 'weekly' ? 'weekly' : 'monthly';
+      const paymentsPerYear = payFreq === 'biweekly' ? 26 : payFreq === 'weekly' ? 52 : 12;
+      const ratePerPmt = balance > 0 && d.rate > 0 ? (d.rate / 100) / paymentsPerYear : 0;
+      const interestPerPmt  = balance * ratePerPmt;
+      const principalPerPmt = Math.max(0, minimum - interestPerPmt);
+
+      // Payments this month from fixed expense biweekly setting
+      const fixedCatId = 'car_payment';
+      const pmtsThisMonth = payFreq === 'biweekly'
+        ? (getMonth(currentMonth).biweekly?.[fixedCatId]?.count || 2)
+        : payFreq === 'weekly'
+          ? (getMonth(currentMonth).biweekly?.[fixedCatId]?.count || 4)
+          : 1;
+      const totalInterestMonth  = interestPerPmt * pmtsThisMonth;
+      const totalPrincipalMonth = principalPerPmt * pmtsThisMonth;
+      const balanceAfter        = Math.max(0, balance - totalPrincipalMonth);
+
+      const breakdownRow = balance > 0 && minimum > 0 && d.rate >= 0 ? `
+        <tr style="background:rgba(20,184,166,0.04)">
+          <td colspan="9" style="padding:0.3rem 0.75rem 0.75rem 2rem">
+            <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:0.6rem;margin-bottom:0.5rem">
+              <div style="background:var(--surface2);border:1px solid var(--border);border-radius:var(--r);padding:0.5rem 0.75rem">
+                <div class="text-xs text-dim fw-700 mb-1" style="text-transform:uppercase;letter-spacing:.05em">Interest per ${freqLabel} pmt</div>
+                <div class="num fw-700 text-red">${fmt(interestPerPmt)}</div>
+              </div>
+              <div style="background:var(--surface2);border:1px solid var(--border);border-radius:var(--r);padding:0.5rem 0.75rem">
+                <div class="text-xs text-dim fw-700 mb-1" style="text-transform:uppercase;letter-spacing:.05em">Principal per pmt</div>
+                <div class="num fw-700 text-green">${fmt(principalPerPmt)}</div>
+              </div>
+              <div style="background:var(--surface2);border:1px solid var(--border);border-radius:var(--r);padding:0.5rem 0.75rem">
+                <div class="text-xs text-dim fw-700 mb-1" style="text-transform:uppercase;letter-spacing:.05em">This month (${pmtsThisMonth} pmts)</div>
+                <div class="num fw-700 text-orange">${fmt(minimum * pmtsThisMonth)}</div>
+                <div class="text-xs text-muted mt-1">Interest ${fmt(totalInterestMonth)} · Principal ${fmt(totalPrincipalMonth)}</div>
+              </div>
+              <div style="background:var(--surface2);border:1px solid var(--border);border-radius:var(--r);padding:0.5rem 0.75rem">
+                <div class="text-xs text-dim fw-700 mb-1" style="text-transform:uppercase;letter-spacing:.05em">Balance after month</div>
+                <div class="num fw-700 text-teal">${fmt(balanceAfter, 0)}</div>
+              </div>
+            </div>
+            <button class="btn btn-teal btn-sm" onclick="applyDebtPayments('${d.id}',${totalPrincipalMonth.toFixed(2)})">
+              ✓ Apply ${pmtsThisMonth} payment${pmtsThisMonth > 1 ? 's' : ''} — reduce balance by ${fmt(totalPrincipalMonth)}
+            </button>
+          </td>
+        </tr>` : '';
+
       return `<tr>
         <td><div class="snowball-order">${idx + 1}</div></td>
         <td>
           <div class="fw-600">${d.name}</div>
-          <div class="progress-wrap mt-1" style="width:80px;height:4px">
-            <div class="progress-bar progress-orange" style="width:${progress.toFixed(0)}%"></div>
+          <div class="flex items-center gap-2 mt-1">
+            <div class="progress-wrap" style="width:80px;height:4px">
+              <div class="progress-bar progress-orange" style="width:${progress.toFixed(0)}%"></div>
+            </div>
+            <span class="text-xs text-muted">${freqLabel}</span>
           </div>
         </td>
         <td class="td-num text-dim">${original > 0 ? fmt(original,0) : '—'}</td>
@@ -3079,7 +3636,7 @@ function renderDebtTable() {
             onchange="updateDebtBalance('${d.id}',this.value)" style="max-width:120px" />
         </td>
         <td class="td-num text-dim">${d.rate > 0 ? d.rate.toFixed(2) + '%' : '0%'}</td>
-        <td class="td-num text-dim">${minimum > 0 ? fmt(minimum,0) : '—'}</td>
+        <td class="td-num text-dim">${minimum > 0 ? fmt(minimum,0) + '<div class="text-xs text-muted">/' + freqLabel + '</div>' : '—'}</td>
         <td class="td-num">
           <input type="number" class="inline-input text-orange"
             value="${extra||''}" placeholder="0.00" min="0" step="0.01"
@@ -3090,7 +3647,7 @@ function renderDebtTable() {
           <button class="btn btn-ghost btn-sm" onclick="openDebtModal('${d.id}')">✏️</button>
           <button class="btn btn-danger btn-sm" onclick="deleteDebt('${d.id}')">🗑</button>
         </td>
-      </tr>`;
+      </tr>${breakdownRow}`;
     }
   }).join('');
 
@@ -3125,6 +3682,16 @@ function renderDebtTable() {
 function updateDebtBalance(id, val) {
   const d = state.debts.find(x => x.id === id);
   if (d) { d.balance = parseFloat(val) || 0; saveData(); renderDebtTable(); renderBabySteps(); if(activeTab==='home') renderHome(); }
+}
+
+function applyDebtPayments(id, principalAmount) {
+  const d = state.debts.find(x => x.id === id);
+  if (!d) return;
+  const newBalance = Math.max(0, (parseFloat(d.balance)||0) - principalAmount);
+  d.balance = parseFloat(newBalance.toFixed(2));
+  saveData(); renderDebt();
+  if (activeTab === 'home') renderHome();
+  toast(`Balance updated — ${fmt(principalAmount)} principal deducted · New balance: ${fmt(d.balance, 0)}`, 'success');
 }
 
 function updateDebtExtra(id, val) {
@@ -3189,6 +3756,7 @@ function openDebtModal(id) {
     document.getElementById('debtOriginal').value = d?.original || '';
     document.getElementById('debtBalance').value  = d?.balance  || '';
     document.getElementById('debtRate').value     = d?.rate     || '';
+    document.getElementById('debtFreq').value     = d?.payFreq  || 'monthly';
     document.getElementById('debtMin').value      = d?.minimum  || '';
   }
   document.getElementById('debtModal').classList.add('open');
@@ -3213,7 +3781,8 @@ function saveDebt() {
     const rate     = parseFloat(document.getElementById('debtRate').value)     || 0;
     const minimum  = parseFloat(document.getElementById('debtMin').value)      || 0;
     if (!name) { toast('Enter a debt name', 'error'); return; }
-    entry = { id: editingDebtId || uid(), type: 'loan', name, original, balance, rate, minimum };
+    entry = { id: editingDebtId || uid(), type: 'loan', name, original, balance,
+              rate, minimum, payFreq: document.getElementById('debtFreq').value || 'monthly' };
   }
 
   if (!state.debts) state.debts = [];
@@ -3483,6 +4052,26 @@ function updateFxUI() {
   }
 }
 
+function toggleInvestNickname() {
+  const wrap = document.getElementById('investNicknameWrap');
+  const btn  = document.getElementById('investNicknameBtn');
+  const showing = wrap.style.display !== 'none';
+  wrap.style.display = showing ? 'none' : 'block';
+  btn.textContent = showing ? '+ Add Nickname' : '− Remove Nickname';
+  if (showing) document.getElementById('investAccNickname').value = '';
+  else document.getElementById('investAccNickname').focus();
+}
+
+function toggleBankNickname() {
+  const wrap = document.getElementById('bankNicknameWrap');
+  const btn  = document.getElementById('bankNicknameBtn');
+  const showing = wrap.style.display !== 'none';
+  wrap.style.display = showing ? 'none' : 'block';
+  btn.textContent = showing ? '+ Add Nickname' : '− Remove Nickname';
+  if (showing) document.getElementById('bankAcctNickname').value = '';
+  else document.getElementById('bankAcctNickname').focus();
+}
+
 function updateBalanceCurrencyLabel() {
   const cur = document.getElementById('investAccCurrency')?.value || 'CAD';
   const lbl = document.getElementById('investAccBalanceLabel');
@@ -3641,7 +4230,6 @@ function openInvestAccountModal(id) {
   editingInvestAccId = id || null;
   const a = id ? (state.investAccounts||[]).find(x => x.id === id) : null;
   document.getElementById('investAccountModalTitle').textContent = a ? 'Edit Account' : 'Add Investment Account';
-  document.getElementById('investAccName').value     = a?.name        || '';
   document.getElementById('investAccType').value     = a?.type        || 'TFSA';
   document.getElementById('investAccInst').value     = a?.institution || '';
   document.getElementById('investAccBalance').value  = a?.balance     || '';
@@ -3650,18 +4238,28 @@ function openInvestAccountModal(id) {
   document.getElementById('investAccEditId').value   = id || '';
   updateBalanceCurrencyLabel();
   document.getElementById('investAccountModal').classList.add('open');
-  document.getElementById('investAccName').focus();
+  document.getElementById('investAccInst').focus();
+  // Nickname — show if existing account has one
+  const wrap = document.getElementById('investNicknameWrap');
+  const btn  = document.getElementById('investNicknameBtn');
+  const nick = a?.nickname || '';
+  document.getElementById('investAccNickname').value = nick;
+  wrap.style.display = nick ? 'block' : 'none';
+  btn.textContent = nick ? '− Remove Nickname' : '+ Add Nickname';
 }
 
 function saveInvestAccount() {
-  const name = document.getElementById('investAccName').value.trim();
-  if (!name) { toast('Enter an account name', 'error'); return; }
+  const type     = document.getElementById('investAccType').value;
+  const inst     = document.getElementById('investAccInst').value.trim();
   const currency = document.getElementById('investAccCurrency').value || 'CAD';
+  const nick     = document.getElementById('investAccNickname').value.trim();
+  const name     = nick || (inst ? `${inst} ${type}` : type);
   const entry = {
     id:          editingInvestAccId || uid(),
     name,
-    type:        document.getElementById('investAccType').value,
-    institution: document.getElementById('investAccInst').value.trim(),
+    nickname:    nick || '',
+    type,
+    institution: inst,
     balance:     parseFloat(document.getElementById('investAccBalance').value) || 0,
     target:      parseFloat(document.getElementById('investAccTarget').value)  || 0,
     currency,
@@ -3998,7 +4596,16 @@ function renderAcctFxNote() {
 
 function updateBankAcctBalance(id, val) {
   const a = (state.bankAccounts||[]).find(x => x.id === id);
-  if (a) { a.balance = parseFloat(val) || 0; saveData(); renderAcctSummary(); renderAcctFxNote(); }
+  if (a) {
+    a.balance = parseFloat(val) || 0;
+    saveData();
+    renderAcctSummary(); renderAcctFxNote();
+    // Auto-route Splitwise to correct tab
+    if (a.type === 'Splitwise') {
+      if (activeTab === 'income') renderReceivables();
+      if (activeTab === 'debt')   { renderSplitweDebt(); renderDebtTable(); }
+    }
+  }
 }
 
 function updateBankAcctBalanceLabel() {
@@ -4014,7 +4621,6 @@ function openBankAcctModal(id) {
   editingBankAcctId = id || null;
   const a = id ? (state.bankAccounts||[]).find(x => x.id === id) : null;
   document.getElementById('bankAcctModalTitle').textContent = a ? 'Edit Account' : 'Add Bank Account';
-  document.getElementById('bankAcctName').value     = a?.name     || '';
   document.getElementById('bankAcctBank').value     = a?.bank     || '';
   document.getElementById('bankAcctType').value     = a?.type     || 'Chequing';
   document.getElementById('bankAcctCurrency').value = a?.currency || 'CAD';
@@ -4023,17 +4629,27 @@ function openBankAcctModal(id) {
   document.getElementById('bankAcctEditId').value   = id || '';
   updateBankAcctBalanceLabel();
   document.getElementById('bankAcctModal').classList.add('open');
-  document.getElementById('bankAcctName').focus();
+  document.getElementById('bankAcctBank').focus();
+  // Nickname
+  const wrapB = document.getElementById('bankNicknameWrap');
+  const btnB  = document.getElementById('bankNicknameBtn');
+  const nickB = a?.nickname || '';
+  document.getElementById('bankAcctNickname').value = nickB;
+  wrapB.style.display = nickB ? 'block' : 'none';
+  btnB.textContent = nickB ? '− Remove Nickname' : '+ Add Nickname';
 }
 
 function saveBankAcct() {
-  const name = document.getElementById('bankAcctName').value.trim();
-  if (!name) { toast('Enter an account name', 'error'); return; }
+  const bank = document.getElementById('bankAcctBank').value.trim();
+  const type = document.getElementById('bankAcctType').value;
+  const nickBank = document.getElementById('bankAcctNickname').value.trim();
+  const name     = nickBank || (bank ? `${bank} ${type}` : type);
   const entry = {
     id:       editingBankAcctId || uid(),
     name,
-    bank:     document.getElementById('bankAcctBank').value.trim(),
-    type:     document.getElementById('bankAcctType').value,
+    nickname: nickBank || '',
+    bank,
+    type,
     currency: document.getElementById('bankAcctCurrency').value,
     balance:  parseFloat(document.getElementById('bankAcctBalance').value) || 0,
     notes:    document.getElementById('bankAcctNotes').value.trim(),
@@ -4441,7 +5057,215 @@ function init() {
   }
 }
 
-document.addEventListener('DOMContentLoaded', init);
+/* ============================================================
+   TOTP ENGINE — Google Authenticator compatible
+   ============================================================ */
+const TOTP = {
+  // Base32 alphabet
+  B32: 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567',
+
+  // Generate a random Base32 secret (20 bytes = 160 bits)
+  generateSecret() {
+    const bytes = new Uint8Array(20);
+    crypto.getRandomValues(bytes);
+    let out = '';
+    for (let i = 0; i < bytes.length; i += 5) {
+      const b = [bytes[i]||0, bytes[i+1]||0, bytes[i+2]||0, bytes[i+3]||0, bytes[i+4]||0];
+      out += this.B32[(b[0] >> 3) & 31];
+      out += this.B32[((b[0] << 2) | (b[1] >> 6)) & 31];
+      out += this.B32[(b[1] >> 1) & 31];
+      out += this.B32[((b[1] << 4) | (b[2] >> 4)) & 31];
+      out += this.B32[((b[2] << 1) | (b[3] >> 7)) & 31];
+      out += this.B32[(b[3] >> 2) & 31];
+      out += this.B32[((b[3] << 3) | (b[4] >> 5)) & 31];
+      out += this.B32[b[4] & 31];
+    }
+    return out.slice(0, 32); // 32 chars = 160 bits
+  },
+
+  // Decode Base32 secret to Uint8Array
+  decodeBase32(s) {
+    s = s.toUpperCase().replace(/[^A-Z2-7]/g, '');
+    const bytes = [];
+    let buf = 0, bitsLeft = 0;
+    for (const c of s) {
+      buf = (buf << 5) | this.B32.indexOf(c);
+      bitsLeft += 5;
+      if (bitsLeft >= 8) { bitsLeft -= 8; bytes.push((buf >> bitsLeft) & 0xff); }
+    }
+    return new Uint8Array(bytes);
+  },
+
+  // Generate TOTP code (async — uses Web Crypto API)
+  async generate(secret, offset = 0) {
+    const key   = this.decodeBase32(secret);
+    const count = Math.floor(Date.now() / 1000 / 30) + offset;
+    const msg   = new Uint8Array(8);
+    let c = count;
+    for (let i = 7; i >= 0; i--) { msg[i] = c & 0xff; c >>= 8; }
+
+    const cryptoKey = await crypto.subtle.importKey(
+      'raw', key, { name: 'HMAC', hash: 'SHA-1' }, false, ['sign']
+    );
+    const sig = new Uint8Array(await crypto.subtle.sign('HMAC', cryptoKey, msg));
+
+    const off  = sig[19] & 0xf;
+    const code = ((sig[off] & 0x7f) << 24 | sig[off+1] << 16 | sig[off+2] << 8 | sig[off+3]) % 1_000_000;
+    return String(code).padStart(6, '0');
+  },
+
+  // Verify — check current window + ±1 step for clock drift
+  async verify(secret, input) {
+    for (const offset of [0, -1, 1]) {
+      if (await this.generate(secret, offset) === input) return true;
+    }
+    return false;
+  }
+};
+
+/* ============================================================
+   LOCK SCREEN CONTROLLER
+   ============================================================ */
+const LS_SECRET_KEY = 'financeos_totp_secret';
+const SESSION_KEY   = 'financeos_unlocked';
+
+let lockTimerInterval = null;
+
+function getStoredSecret() { return localStorage.getItem(LS_SECRET_KEY); }
+
+function showLockScreen() {
+  const secret = getStoredSecret();
+  if (!secret) {
+    // First time — show setup
+    const newSecret = TOTP.generateSecret();
+    localStorage.setItem(LS_SECRET_KEY, newSecret);
+    document.getElementById('setupSecretDisplay').textContent = newSecret.match(/.{1,4}/g).join(' ');
+    document.getElementById('setupView').style.display = '';
+    document.getElementById('authView').style.display  = 'none';
+  } else {
+    // Returning — show auth
+    document.getElementById('authView').style.display  = '';
+    document.getElementById('setupView').style.display = 'none';
+    startLockTimer();
+    focusFirstOtp();
+  }
+  document.getElementById('lockScreen').style.display = 'flex';
+}
+
+function hideLockScreen() {
+  sessionStorage.setItem(SESSION_KEY, '1');
+  const ls = document.getElementById('lockScreen');
+  ls.style.transition = 'opacity 0.4s';
+  ls.style.opacity = '0';
+  setTimeout(() => { ls.style.display = 'none'; ls.style.opacity = '1'; }, 420);
+}
+
+function startLockTimer() {
+  clearInterval(lockTimerInterval);
+  function tick() {
+    const secs = 30 - (Math.floor(Date.now()/1000) % 30);
+    const el = document.getElementById('lockTimerDisplay');
+    if (el) el.textContent = secs;
+  }
+  tick();
+  lockTimerInterval = setInterval(tick, 1000);
+}
+
+function focusFirstOtp() {
+  const boxes = document.querySelectorAll('.otp-box');
+  if (boxes[0]) boxes[0].focus();
+}
+
+function getOtpValue() {
+  return [...document.querySelectorAll('.otp-box')].map(b => b.value).join('');
+}
+
+function clearOtp() {
+  document.querySelectorAll('.otp-box').forEach(b => { b.value = ''; b.classList.remove('filled','error'); });
+  focusFirstOtp();
+}
+
+function showOtpError(msg) {
+  document.getElementById('lockError').textContent = msg;
+  document.querySelectorAll('.otp-box').forEach(b => b.classList.add('error'));
+  setTimeout(() => {
+    document.querySelectorAll('.otp-box').forEach(b => b.classList.remove('error'));
+    document.getElementById('lockError').textContent = '';
+    clearOtp();
+  }, 1200);
+}
+
+async function attemptUnlock() {
+  const code = getOtpValue();
+  if (code.length !== 6) { showOtpError('Enter all 6 digits'); return; }
+  const secret = getStoredSecret();
+  const valid  = await TOTP.verify(secret, code);
+  if (valid) {
+    clearInterval(lockTimerInterval);
+    hideLockScreen();
+  } else {
+    showOtpError('Incorrect code — try again');
+  }
+}
+
+function bindLockScreen() {
+  // OTP box navigation
+  document.querySelectorAll('.otp-box').forEach((box, idx, all) => {
+    box.addEventListener('input', e => {
+      const v = e.target.value.replace(/[^0-9]/g,'');
+      e.target.value = v ? v[v.length-1] : '';
+      if (v && idx < 5) { all[idx+1].focus(); all[idx+1].select(); }
+      box.classList.toggle('filled', !!e.target.value);
+      // Auto-submit when all 6 filled
+      if (getOtpValue().length === 6) attemptUnlock();
+    });
+    box.addEventListener('keydown', e => {
+      if (e.key === 'Backspace' && !box.value && idx > 0) {
+        all[idx-1].focus(); all[idx-1].value = ''; all[idx-1].classList.remove('filled');
+      }
+      if (e.key === 'Enter') attemptUnlock();
+    });
+    box.addEventListener('paste', e => {
+      e.preventDefault();
+      const digits = (e.clipboardData.getData('text')||'').replace(/[^0-9]/g,'').slice(0,6);
+      [...digits].forEach((d, i) => { if(all[i]){ all[i].value=d; all[i].classList.add('filled'); } });
+      if (digits.length === 6) attemptUnlock();
+      else if (all[digits.length]) all[digits.length].focus();
+    });
+  });
+
+  document.getElementById('unlockBtn').addEventListener('click', attemptUnlock);
+
+  document.getElementById('setupDoneBtn').addEventListener('click', () => {
+    document.getElementById('authView').style.display  = '';
+    document.getElementById('setupView').style.display = 'none';
+    startLockTimer();
+    focusFirstOtp();
+  });
+
+  document.getElementById('resetAuthBtn').addEventListener('click', () => {
+    if (confirm('This will delete your TOTP secret and show the setup screen again. You will need to re-add FinanceOS to your Authenticator app. Continue?')) {
+      localStorage.removeItem(LS_SECRET_KEY);
+      sessionStorage.removeItem(SESSION_KEY);
+      location.reload();
+    }
+  });
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  bindLockScreen();
+  // Skip lock if already unlocked this session
+  if (sessionStorage.getItem(SESSION_KEY) === '1') {
+    document.getElementById('lockScreen').style.display = 'none';
+    init();
+  } else {
+    showLockScreen();
+    // Init app in background so it's ready when unlocked
+    init();
+  }
+});
+
+// Override the original DOMContentLoaded — replaced above
 </script>
 </body>
 </html>
