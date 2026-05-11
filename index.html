@@ -5,86 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
 <title>FinanceOS</title>
 <style>
-/* ============================================================
-   LOCK SCREEN
-   ============================================================ */
-#lockScreen {
-  position: fixed; inset: 0; z-index: 9999;
-  background: var(--bg);
-  display: flex; align-items: center; justify-content: center;
-  flex-direction: column;
-  background-image:
-    linear-gradient(rgba(20,184,166,0.03) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(20,184,166,0.03) 1px, transparent 1px);
-  background-size: 40px 40px;
-}
-.lock-card {
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 16px;
-  padding: 2.5rem 2rem;
-  width: 100%; max-width: 380px;
-  text-align: center;
-  box-shadow: 0 20px 60px rgba(0,0,0,0.5);
-}
-.lock-icon { font-size: 2.5rem; margin-bottom: 1rem; }
-.lock-title { font-size: 1.3rem; font-weight: 800; margin-bottom: 0.3rem; }
-.lock-subtitle { font-size: 0.85rem; color: var(--dim); margin-bottom: 1.75rem; }
 
-/* 6-digit OTP input boxes */
-.otp-row {
-  display: flex; gap: 0.5rem; justify-content: center;
-  margin-bottom: 1.25rem;
-}
-.otp-box {
-  width: 46px; height: 58px;
-  background: var(--surface2);
-  border: 2px solid var(--border);
-  border-radius: 10px;
-  font-family: var(--num);
-  font-size: 1.6rem; font-weight: 700;
-  text-align: center; color: var(--text);
-  outline: none;
-  transition: border-color 0.15s, background 0.15s;
-  caret-color: var(--orange);
-}
-.otp-box:focus { border-color: var(--orange); background: var(--surface3); }
-.otp-box.filled { border-color: var(--teal); }
-.otp-box.error  { border-color: var(--red); background: var(--red-g); animation: shake 0.4s; }
-
-@keyframes shake {
-  0%,100%{transform:translateX(0)}
-  20%,60%{transform:translateX(-6px)}
-  40%,80%{transform:translateX(6px)}
-}
-
-.lock-timer {
-  font-size: 0.75rem; color: var(--dim);
-  margin-bottom: 1rem; font-family: var(--num);
-}
-.lock-timer span { color: var(--orange); font-weight: 700; }
-
-/* Setup screen */
-.secret-display {
-  background: var(--surface2);
-  border: 1px solid var(--border);
-  border-radius: var(--r);
-  padding: 0.75rem 1rem;
-  font-family: var(--num);
-  font-size: 1rem; font-weight: 700;
-  letter-spacing: 0.15em;
-  color: var(--teal);
-  word-break: break-all;
-  margin: 1rem 0;
-}
-.setup-steps {
-  text-align: left;
-  font-size: 0.82rem;
-  color: var(--dim);
-  line-height: 1.7;
-  margin: 1rem 0;
-}
-.setup-steps li { margin-bottom: 0.3rem; }
 
 /* ============================================================
    CSS VARIABLES & RESET
@@ -786,6 +707,12 @@ input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; marg
 .freq-row.on-monthly  .freq-track { background: var(--teal-g);         border-color: var(--teal); }
 .freq-row.on-monthly  .freq-thumb { transform: translateX(16px); background: var(--teal); }
 
+/* Sortable table headers */
+.sort-th { cursor: pointer; user-select: none; white-space: nowrap; }
+.sort-th:hover { color: var(--text); }
+.sort-icon { display: inline-block; margin-left: 4px; opacity: 0.35; font-size: 0.7rem; vertical-align: middle; }
+.sort-th.sorted .sort-icon { opacity: 1; color: var(--orange); }
+
 /* Row action buttons */
 .row-actions { display: flex; gap: 0.25rem; justify-content: flex-end; white-space: nowrap; }
 .btn-hide { background: transparent; color: var(--muted); border: 1px solid transparent; padding: 0.28rem 0.5rem; font-size: 0.78rem; border-radius: 4px; cursor: pointer; line-height: 1; transition: all 0.15s; }
@@ -800,52 +727,6 @@ input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; marg
 </style>
 </head>
 <body>
-
-<!-- ============================================================
-     LOCK SCREEN — shown before app loads
-     ============================================================ -->
-<div id="lockScreen">
-  <!-- Setup view (first time) -->
-  <div class="lock-card" id="setupView" style="display:none">
-    <div class="lock-icon">🔐</div>
-    <div class="lock-title">Set Up Authenticator</div>
-    <div class="lock-subtitle">Scan this key in Google Authenticator to protect your dashboard.</div>
-    <ol class="setup-steps">
-      <li>Open <strong>Google Authenticator</strong> on your phone</li>
-      <li>Tap <strong>+</strong> → <strong>Enter a setup key</strong></li>
-      <li>Account name: <strong>FinanceOS</strong></li>
-      <li>Copy and paste this key:</li>
-    </ol>
-    <div class="secret-display" id="setupSecretDisplay"></div>
-    <p style="font-size:0.75rem;color:var(--muted);margin-bottom:1.25rem">
-      ⚠️ Save this key somewhere safe. If you lose it, you'll need to reset the app.
-    </p>
-    <button class="btn btn-primary w-full" id="setupDoneBtn" style="width:100%">
-      I've added it — Continue to Dashboard
-    </button>
-  </div>
-
-  <!-- Auth view (every visit) -->
-  <div class="lock-card" id="authView" style="display:none">
-    <div class="lock-icon">🔒</div>
-    <div class="lock-title">FinanceOS</div>
-    <div class="lock-subtitle">Enter the 6-digit code from your Authenticator app</div>
-    <div class="otp-row" id="otpRow">
-      <input class="otp-box" maxlength="1" inputmode="numeric" pattern="[0-9]" data-idx="0" />
-      <input class="otp-box" maxlength="1" inputmode="numeric" pattern="[0-9]" data-idx="1" />
-      <input class="otp-box" maxlength="1" inputmode="numeric" pattern="[0-9]" data-idx="2" />
-      <input class="otp-box" maxlength="1" inputmode="numeric" pattern="[0-9]" data-idx="3" />
-      <input class="otp-box" maxlength="1" inputmode="numeric" pattern="[0-9]" data-idx="4" />
-      <input class="otp-box" maxlength="1" inputmode="numeric" pattern="[0-9]" data-idx="5" />
-    </div>
-    <div class="lock-timer">Code refreshes in <span id="lockTimerDisplay">30</span>s</div>
-    <div id="lockError" style="color:var(--red);font-size:0.82rem;min-height:1.2em;margin-bottom:0.75rem"></div>
-    <button class="btn btn-primary w-full" id="unlockBtn" style="width:100%">Unlock</button>
-    <button class="btn btn-ghost btn-sm mt-2" id="resetAuthBtn" style="width:100%;margin-top:0.5rem;color:var(--muted)">
-      Reset authenticator (lost access)
-    </button>
-  </div>
-</div>
 <div id="app">
 
   <!-- ============================================================
@@ -1037,9 +918,9 @@ input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; marg
             <table id="fixedTable">
               <thead>
                 <tr>
-                  <th>Category</th>
-                  <th style="text-align:right">Budgeted</th>
-                  <th style="text-align:right">Actual (Monthly)</th>
+                  <th class="sort-th" onclick="sortTable('fixedTable','name',renderFixed)">Category<span class="sort-icon">↕</span></th>
+                  <th class="sort-th" style="text-align:right" onclick="sortTable('fixedTable','budgeted',renderFixed)">Budgeted<span class="sort-icon">↕</span></th>
+                  <th class="sort-th" style="text-align:right" onclick="sortTable('fixedTable','actual',renderFixed)">Actual (Monthly)<span class="sort-icon">↕</span></th>
                   <th style="text-align:right">Variance</th>
                   <th style="text-align:center">Weekly</th>
                   <th style="text-align:center">Bi-Weekly</th>
@@ -1075,11 +956,11 @@ input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; marg
             <table id="variableTable">
               <thead>
                 <tr>
-                  <th>Category</th>
-                  <th style="text-align:right">Budgeted</th>
-                  <th style="text-align:right">Actual</th>
+                  <th class="sort-th" onclick="sortTable('variableTable','name',renderVariable)">Category<span class="sort-icon">↕</span></th>
+                  <th class="sort-th" style="text-align:right" onclick="sortTable('variableTable','budgeted',renderVariable)">Budgeted<span class="sort-icon">↕</span></th>
+                  <th class="sort-th" style="text-align:right" onclick="sortTable('variableTable','actual',renderVariable)">Actual<span class="sort-icon">↕</span></th>
                   <th style="text-align:right">Variance</th>
-                  <th style="text-align:right">% of Income</th>
+                  <th class="sort-th" style="text-align:right" onclick="sortTable('variableTable','actual',renderVariable)">% of Income<span class="sort-icon">↕</span></th>
                   <th></th>
                 </tr>
               </thead>
@@ -1283,12 +1164,12 @@ input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; marg
             <table id="investTable">
               <thead>
                 <tr>
-                  <th>Account</th>
-                  <th>Type</th>
-                  <th>Institution</th>
+                  <th class="sort-th" onclick="sortTable('investTable','institution',renderInvestTable)">Account / Institution<span class="sort-icon">↕</span></th>
+                  <th class="sort-th" onclick="sortTable('investTable','type',renderInvestTable)">Type<span class="sort-icon">↕</span></th>
+                  <th></th>
                   <th style="text-align:right">Balance</th>
-                  <th style="text-align:right">≈ CAD</th>
-                  <th style="text-align:right">Monthly Target</th>
+                  <th class="sort-th" style="text-align:right" onclick="sortTable('investTable','balance',renderInvestTable)">≈ CAD<span class="sort-icon">↕</span></th>
+                  <th class="sort-th" style="text-align:right" onclick="sortTable('investTable','target',renderInvestTable)">Monthly Target<span class="sort-icon">↕</span></th>
                   <th style="text-align:right">Contributed This Month</th>
                   <th style="text-align:right">YTD</th>
                   <th></th>
@@ -1371,13 +1252,13 @@ input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; marg
         <div class="card">
           <div class="table-wrap">
             <table id="bankAcctTable">
-              <thead>
+              <thead id="bankAcctHead">
                 <tr>
-                  <th>Account Name</th>
-                  <th>Bank / Institution</th>
-                  <th>Type</th>
-                  <th>Currency</th>
-                  <th style="text-align:right">Balance</th>
+                  <th class="sort-th" onclick="sortTable('bankAcctTable','name',renderAcctTable)">Account Name<span class="sort-icon">↕</span></th>
+                  <th class="sort-th" onclick="sortTable('bankAcctTable','bank',renderAcctTable)">Bank / Institution<span class="sort-icon">↕</span></th>
+                  <th class="sort-th" onclick="sortTable('bankAcctTable','type',renderAcctTable)">Type<span class="sort-icon">↕</span></th>
+                  <th class="sort-th" onclick="sortTable('bankAcctTable','currency',renderAcctTable)">Currency<span class="sort-icon">↕</span></th>
+                  <th class="sort-th" style="text-align:right" onclick="sortTable('bankAcctTable','balance',renderAcctTable)">Balance<span class="sort-icon">↕</span></th>
                   <th style="text-align:right">≈ CAD</th>
                   <th></th>
                 </tr>
@@ -1407,6 +1288,44 @@ input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; marg
         </div>
       </div>
 
+      <!-- Auto Transfers -->
+      <div class="section mt-4">
+        <div class="section-header">
+          <h2>🔄 Scheduled Auto Transfers</h2>
+          <button class="btn btn-primary btn-sm" id="addTransferBtn">+ Add Transfer</button>
+        </div>
+
+        <!-- Monthly summary strip -->
+        <div class="grid-3 mb-3" id="transferSummaryCards"></div>
+
+        <div class="card">
+          <div class="table-wrap">
+            <table id="transferTable">
+              <thead>
+                <tr>
+                  <th class="sort-th" onclick="sortTable('transferTable','name',renderTransfers)">Transfer<span class="sort-icon">↕</span></th>
+                  <th class="sort-th" onclick="sortTable('transferTable','from',renderTransfers)">From<span class="sort-icon">↕</span></th>
+                  <th class="sort-th" onclick="sortTable('transferTable','to',renderTransfers)">To<span class="sort-icon">↕</span></th>
+                  <th class="sort-th" style="text-align:right" onclick="sortTable('transferTable','amount',renderTransfers)">Amount<span class="sort-icon">↕</span></th>
+                  <th class="sort-th" onclick="sortTable('transferTable','freq',renderTransfers)">Frequency<span class="sort-icon">↕</span></th>
+                  <th>Trigger / Day</th>
+                  <th style="text-align:right">This Month</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody id="transferBody"></tbody>
+              <tfoot>
+                <tr>
+                  <td colspan="3" style="font-weight:700;color:var(--dim)">Total Moved This Month</td>
+                  <td class="td-num text-teal fw-700" id="transferMonthTotal">$0</td>
+                  <td colspan="4"></td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+        </div>
+      </div>
+
     </div>
 
     <!-- ====== UPCOMING TAB ====== -->
@@ -1421,12 +1340,12 @@ input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; marg
             <table id="upcomingTable">
               <thead>
                 <tr>
-                  <th>Name</th>
-                  <th style="text-align:right">Est. Cost</th>
-                  <th>Due Date</th>
-                  <th>Category</th>
-                  <th>Priority</th>
-                  <th>Status</th>
+                  <th class="sort-th" onclick="sortTable('upcomingTable','name',renderUpcoming)">Name<span class="sort-icon">↕</span></th>
+                  <th class="sort-th" style="text-align:right" onclick="sortTable('upcomingTable','cost',renderUpcoming)">Est. Cost<span class="sort-icon">↕</span></th>
+                  <th class="sort-th" onclick="sortTable('upcomingTable','due',renderUpcoming)">Due Date<span class="sort-icon">↕</span></th>
+                  <th class="sort-th" onclick="sortTable('upcomingTable','category',renderUpcoming)">Category<span class="sort-icon">↕</span></th>
+                  <th class="sort-th" onclick="sortTable('upcomingTable','priority',renderUpcoming)">Priority<span class="sort-icon">↕</span></th>
+                  <th class="sort-th" onclick="sortTable('upcomingTable','status',renderUpcoming)">Status<span class="sort-icon">↕</span></th>
                   <th></th>
                 </tr>
               </thead>
@@ -1720,6 +1639,64 @@ input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; marg
   </div>
 </div>
 
+<!-- Add Auto Transfer Modal -->
+<div class="modal-overlay" id="transferModal">
+  <div class="modal" style="max-width:480px">
+    <div class="modal-header">
+      <h2 id="transferModalTitle">Add Auto Transfer</h2>
+      <button class="btn btn-ghost btn-icon" id="transferModalClose">✕</button>
+    </div>
+    <div class="grid-2 gap-3">
+      <div class="form-group" style="grid-column:1/-1">
+        <label class="form-label">Transfer Name / Description</label>
+        <input type="text" class="form-input" id="transferName" placeholder="e.g. Savings Transfer, CTB Savings…" />
+      </div>
+      <div class="form-group">
+        <label class="form-label">From Account</label>
+        <input type="text" class="form-input" id="transferFrom" placeholder="e.g. Tangerine, RBC…" />
+      </div>
+      <div class="form-group">
+        <label class="form-label">To Account</label>
+        <input type="text" class="form-input" id="transferTo" placeholder="e.g. Wealthsimple TFSA…" />
+      </div>
+      <div class="form-group">
+        <label class="form-label">Amount ($)</label>
+        <input type="number" class="form-input num-input" id="transferAmount" placeholder="0.00" min="0" step="0.01" />
+      </div>
+      <div class="form-group">
+        <label class="form-label">Frequency</label>
+        <select class="form-select" id="transferFreq" onchange="updateTransferTriggerUI()">
+          <option value="biweekly">Bi-weekly</option>
+          <option value="monthly">Monthly</option>
+          <option value="weekly">Weekly</option>
+          <option value="perPaycheck">Per Paycheck</option>
+        </select>
+      </div>
+      <div class="form-group" style="grid-column:1/-1" id="transferTriggerWrap">
+        <label class="form-label" id="transferTriggerLabel">Trigger</label>
+        <select class="form-select" id="transferTriggerType" onchange="updateTransferTriggerUI()">
+          <option value="linkedDebt">Same day as car payment</option>
+          <option value="date">Specific day of month</option>
+          <option value="paycheck">Day of paycheck</option>
+        </select>
+      </div>
+      <div class="form-group" id="transferDayWrap" style="grid-column:1/-1;display:none">
+        <label class="form-label">Day of Month</label>
+        <input type="number" class="form-input num-input" id="transferDay" placeholder="e.g. 13" min="1" max="31" />
+      </div>
+      <div class="form-group" style="grid-column:1/-1">
+        <label class="form-label">Notes (optional)</label>
+        <input type="text" class="form-input" id="transferNotes" placeholder="e.g. Goes out with car payment, CTB savings…" />
+      </div>
+    </div>
+    <input type="hidden" id="transferEditId" />
+    <div class="modal-actions">
+      <button class="btn btn-secondary" id="transferModalCancel">Cancel</button>
+      <button class="btn btn-primary" id="transferModalSave">Save</button>
+    </div>
+  </div>
+</div>
+
 <!-- Add Bank Account Modal -->
 <div class="modal-overlay" id="bankAcctModal">
   <div class="modal" style="max-width:480px">
@@ -1996,6 +1973,32 @@ let state = {
   fullEmergencyFund: 0,  // current BS3 balance
   fullEFGoal: 20000,     // user-set goal ($20k–$40k range)
   bankAccounts: [],      // [{ id, name, bank, type, currency, balance, notes }]
+  autoTransfers: [
+    {
+      id: 'at_savings',
+      name: 'Savings Transfer',
+      from: 'Tangerine',
+      to: 'Wealthsimple TFSA',
+      amount: 100,
+      freq: 'biweekly',
+      triggerType: 'linkedDebt',
+      triggerDay: null,
+      notes: 'Goes out same day as car payment (bi-weekly Tuesday)',
+      active: true,
+    },
+    {
+      id: 'at_ctb',
+      name: 'CTB Savings',
+      from: 'RBC',
+      to: 'Tangerine',
+      amount: 70,
+      freq: 'monthly',
+      triggerType: 'date',
+      triggerDay: 13,
+      notes: 'Government CTB ~$74–75 arrives around 10th, auto-transfer on 13th',
+      active: true,
+    },
+  ],
   budgetDefaults: {},   // { 'fixed:catId': amount, 'variable:catId': amount } — carries forward to all months
   allocation: [           // target allocation slices
     { id: 'ca_eq',  label: 'Canadian Equity',       pct: 30 },
@@ -2195,8 +2198,82 @@ let driveFileId = null;
 function initDrive() {
   if (state.googleClientId) {
     document.getElementById('googleClientId').value = state.googleClientId;
+    // Auto-reconnect silently if Client ID is saved
+    autoConnectDrive();
   }
   updateDriveUI();
+}
+
+async function autoConnectDrive() {
+  // Silently re-authenticate without showing a popup.
+  // Uses prompt:'none' — only works if user already authorized this app before.
+  // If it fails (first time on device), we just stay disconnected until manual connect.
+  const clientId = state.googleClientId;
+  if (!clientId) return;
+  try {
+    setDriveDot('syncing', 'Reconnecting…');
+    await loadGIS(clientId);
+    gisClient = google.accounts.oauth2.initTokenClient({
+      client_id: clientId,
+      scope: DRIVE_SCOPE,
+      prompt: '',           // empty string = skip consent if already granted
+      callback: async (resp) => {
+        if (resp.error) {
+          // Silent fail — user will need to manually connect on this device first time
+          setDriveDot('off', 'Click Drive to connect');
+          return;
+        }
+        driveToken = resp.access_token;
+        setDriveDot('syncing', 'Loading latest data…');
+        updateDriveUI(true);
+        // Auto-load from Drive — this is the key sync step
+        await autoLoadFromDrive();
+      }
+    });
+    gisClient.requestAccessToken({ prompt: '' });
+  } catch(err) {
+    setDriveDot('off', 'Click Drive to connect');
+  }
+}
+
+async function autoLoadFromDrive() {
+  // Silently load latest data from Drive on startup — no toast, no UI interruption
+  if (!driveToken) return;
+  try {
+    const search = await fetch(
+      `https://www.googleapis.com/drive/v3/files?q=name='finance-data.json' and trashed=false&fields=files(id,name)`,
+      { headers: { Authorization: `Bearer ${driveToken}` } }
+    );
+    const res = await search.json();
+    if (!res.files || res.files.length === 0) {
+      setDriveDot('on', 'No backup found — will create on first save');
+      return;
+    }
+    driveFileId = res.files[0].id;
+    const fileResp = await fetch(
+      `https://www.googleapis.com/drive/v3/files/${driveFileId}?alt=media`,
+      { headers: { Authorization: `Bearer ${driveToken}` } }
+    );
+    const imported = await fileResp.json();
+
+    // Only update if Drive data is newer than local
+    // (compare by checking if Drive has more months of data or a newer version)
+    const driveMonths  = Object.keys(imported.months || {}).length;
+    const localMonths  = Object.keys(state.months  || {}).length;
+    const shouldUpdate = driveMonths >= localMonths; // Drive wins on tie or more data
+
+    if (shouldUpdate) {
+      state = Object.assign({}, state, imported);
+      saveData();   // persist to localStorage on this device
+      renderAll();  // refresh the UI
+      setDriveDot('on', 'Synced from Drive · ' + new Date().toLocaleTimeString());
+      toast('✅ Data loaded from Google Drive', 'success');
+    } else {
+      setDriveDot('on', 'Connected · Local data is newer');
+    }
+  } catch(err) {
+    setDriveDot('on', 'Connected — auto-load failed, use Load from Drive');
+  }
 }
 
 function loadGIS(clientId) {
@@ -2226,7 +2303,8 @@ async function connectDrive() {
         driveToken = resp.access_token;
         setDriveDot('on', 'Connected');
         updateDriveUI(true);
-        toast('Google Drive connected!', 'success');
+        toast('Google Drive connected! Loading latest data…', 'success');
+        await autoLoadFromDrive();
       }
     });
     gisClient.requestAccessToken();
@@ -2520,6 +2598,63 @@ function sparkline(data, w = 100, h = 32, color = '#f97316') {
 /* ============================================================
    HOME TAB — OVERVIEW
    ============================================================ */
+/* ============================================================
+   SORT ENGINE — shared by all tables
+   ============================================================ */
+const sortState = {}; // { tableId: { col, dir } }
+
+function sortTable(tableId, col, renderFn) {
+  const cur = sortState[tableId];
+  sortState[tableId] = {
+    col,
+    dir: (cur && cur.col === col && cur.dir === 'asc') ? 'desc' : 'asc',
+  };
+  renderFn();
+  // Update sort arrow indicators on th elements
+  requestAnimationFrame(() => {
+    const table = document.getElementById(tableId);
+    if (!table) return;
+    table.querySelectorAll('th.sort-th').forEach(th => {
+      const thCol = (th.getAttribute('onclick') || '').match(/'([^']+)'\s*,\s*render/)?.[1];
+      if (!thCol) return;
+      const s = sortState[tableId];
+      const active = s && s.col === thCol;
+      th.classList.toggle('sorted', active);
+      const icon = th.querySelector('.sort-icon');
+      if (icon) icon.textContent = active ? (s.dir === 'asc' ? '↑' : '↓') : '↕';
+    });
+  });
+}
+
+function sortIcon(tableId, col) {
+  const s = sortState[tableId];
+  if (!s || s.col !== col) return '<span class="sort-icon">↕</span>';
+  return `<span class="sort-icon">${s.dir === 'asc' ? '↑' : '↓'}</span>`;
+}
+
+function sTh(tableId, col, label, renderFn, extraStyle) {
+  const s = sortState[tableId];
+  const active = s && s.col === col ? ' sorted' : '';
+  const style  = extraStyle ? ` style="${extraStyle}"` : '';
+  return `<th class="sort-th${active}"${style} onclick="sortTable('${tableId}','${col}',${renderFn})">${label}${sortIcon(tableId, col)}</th>`;
+}
+
+function sortData(data, tableId, colMap) {
+  const s = sortState[tableId];
+  if (!s || !colMap[s.col]) return data;
+  const key = colMap[s.col];
+  return [...data].sort((a, b) => {
+    let va = typeof key === 'function' ? key(a) : a[key];
+    let vb = typeof key === 'function' ? key(b) : b[key];
+    const na = parseFloat(va), nb = parseFloat(vb);
+    if (!isNaN(na) && !isNaN(nb)) return s.dir === 'asc' ? na - nb : nb - na;
+    va = String(va ?? '').toLowerCase();
+    vb = String(vb ?? '').toLowerCase();
+    const cmp = va.localeCompare(vb);
+    return s.dir === 'asc' ? cmp : -cmp;
+  });
+}
+
 function renderHome() {
   const ym = currentMonth;
   const t = calcMonthTotals(ym);
@@ -3137,7 +3272,9 @@ function renderFixed() {
   if (!m.biweekly) m.biweekly = {};
   let totBudget = 0, totActual = 0;
 
-  document.getElementById('fixedBody').innerHTML = cats.map(cat => {
+  const fixedColMap = { name: 'name', budgeted: c => parseFloat(state.budgetDefaults?.['fixed:'+c.id])||0, actual: c => parseFloat(getMonth(currentMonth).fixed?.[c.id]?.actual)||0 };
+  const sortedFixed = sortData(cats.map(c => ({...c, _actual: parseFloat(m.fixed?.[c.id]?.actual)||0})), 'fixedTable', { name: 'name', budgeted: c => getBudgeted('fixed',c.id,m,c.budgeted), actual: '_actual' });
+  document.getElementById('fixedBody').innerHTML = sortedFixed.map(cat => {
     const d    = m.fixed?.[cat.id] || {};
     const freq = getFreq(cat.id);
     const bw   = m.biweekly?.[cat.id] || {};
@@ -3252,7 +3389,10 @@ function renderVariable() {
   const hidden = state.hiddenCats || {};
   let totBudget = 0, totActual = 0;
 
-  document.getElementById('variableBody').innerHTML = cats.map(cat => {
+  const sortedVar = sortData(cats.map(c => {
+    const dv = m.variable?.[c.id]||{}; return {...c, _actual: parseFloat(dv.actual)||0, _budgeted: getBudgeted('variable',c.id,m,c.budgeted)};
+  }), 'variableTable', { name: 'name', budgeted: '_budgeted', actual: '_actual' });
+  document.getElementById('variableBody').innerHTML = sortedVar.map(cat => {
     const d = m.variable?.[cat.id] || {};
     const budgeted = getBudgeted('variable', cat.id, m, cat.budgeted);
     const actual   = parseFloat(d.actual) || 0;
@@ -3447,9 +3587,41 @@ function renderDebt() {
   renderDebtTable();
 }
 
+// Returns the effective emergency fund balance.
+// If any bank account has "emergency fund" in its name → uses that sum automatically.
+// Falls back to manually entered state values if no such account exists.
+function getEmergencyFundBalance() {
+  const efAccts = (state.bankAccounts || []).filter(a =>
+    (a.name || '').toLowerCase().includes('emergency fund') ||
+    (a.nickname || '').toLowerCase().includes('emergency fund')
+  );
+  if (efAccts.length > 0) {
+    // Sum all emergency fund accounts (convert to CAD)
+    return efAccts.reduce((s, a) => s + acctToCAD(parseFloat(a.balance)||0, a.currency||'CAD'), 0);
+  }
+  // No linked account — use manual values
+  return state.emergencyFund || 0;
+}
+
+function getFullEmergencyFundBalance() {
+  const efAccts = (state.bankAccounts || []).filter(a =>
+    (a.name || '').toLowerCase().includes('emergency fund') ||
+    (a.nickname || '').toLowerCase().includes('emergency fund')
+  );
+  const raw = efAccts.length > 0
+    ? efAccts.reduce((s, a) => s + acctToCAD(parseFloat(a.balance)||0, a.currency||'CAD'), 0)
+    : state.fullEmergencyFund || 0;
+
+  // BS3 only starts counting once balance exceeds $2,000.
+  // Below $2,000 = interest-earning zone for BS1 — not yet a BS3 contribution.
+  // Above $2,000 = everything above $1,000 counts toward the BS3 goal.
+  if (raw < 2000) return 0;
+  return Math.max(0, raw - 1000);
+}
+
 function renderBabySteps() {
-  const ef       = state.emergencyFund || 0;
-  const fullEF   = state.fullEmergencyFund || 0;
+  const ef       = getEmergencyFundBalance();
+  const fullEF   = getFullEmergencyFundBalance();
   const goal     = state.fullEFGoal || 20000;
   const totalDebt = state.debts.reduce((s, d) => s + (parseFloat(d.balance)||0), 0);
   const step1Done = ef >= 1000;
@@ -3457,15 +3629,25 @@ function renderBabySteps() {
   const step3Done = fullEF >= goal;
   const pct3      = goal > 0 ? Math.min(100, (fullEF / goal * 100)) : 0;
 
+  // Check if values are coming from linked accounts
+  const isLinked = (state.bankAccounts||[]).some(a =>
+    (a.name||'').toLowerCase().includes('emergency fund') ||
+    (a.nickname||'').toLowerCase().includes('emergency fund')
+  );
+  const linkedNote = isLinked ? ' <span class="badge badge-teal" style="font-size:0.65rem">Auto from Accounts</span>' : '';
+
   const steps = [
     { n: 1, title: '$1,000 Starter Emergency Fund',
-      desc: `Current: ${fmt(ef,0)} of $1,000`, done: step1Done, active: !step1Done },
+      desc: `Current: ${fmt(ef,0)} of $1,000${linkedNote}`, done: step1Done, active: !step1Done },
     { n: 2, title: 'Pay Off All Debt (Snowball)',
       desc: totalDebt > 0 ? `${fmt(totalDebt,0)} remaining across ${state.debts.filter(d=>parseFloat(d.balance)>0).length} debts` : 'Debt-free! 🎉',
       done: step2Done, active: step1Done && !step2Done },
     { n: 3, title: '3–6 Month Full Emergency Fund',
-      desc: step3Done ? `${fmt(fullEF,0)} saved — goal reached! 🎉`
-                      : `${fmt(fullEF,0)} of ${fmt(goal,0)} goal · ${pct3.toFixed(0)}% · Go to Investments tab to update`,
+      desc: step3Done
+        ? `${fmt(getEmergencyFundBalance(),0)} saved — goal reached! 🎉`
+        : fullEF > 0
+          ? `${fmt(fullEF,0)} of ${fmt(goal,0)} goal · ${pct3.toFixed(0)}%${linkedNote}`
+          : `Starts counting once Emergency Fund balance exceeds $2,000 · Currently ${fmt(getEmergencyFundBalance(),0)}`,
       done: step3Done, active: step2Done && !step3Done },
     { n: 4, title: 'Invest 15% in Retirement',
       desc: 'RRSP / TFSA contributions', done: false, active: step3Done },
@@ -3491,12 +3673,21 @@ function renderBabySteps() {
 }
 
 function renderEmergencyFund() {
-  const ef = state.emergencyFund || 0;
+  const ef = getEmergencyFundBalance();
   const pct = Math.min(ef / 1000 * 100, 100);
+  const isLinked = (state.bankAccounts||[]).some(a =>
+    (a.name||'').toLowerCase().includes('emergency fund') ||
+    (a.nickname||'').toLowerCase().includes('emergency fund')
+  );
   document.getElementById('efDisplay').textContent = fmt(ef, 0);
   document.getElementById('efBar').style.width = pct + '%';
-  document.getElementById('efPct').textContent = pct.toFixed(0) + '% funded';
-  document.getElementById('efInput').value = ef || '';
+  document.getElementById('efPct').textContent = pct.toFixed(0) + '% funded'
+    + (isLinked ? ' · Auto-synced from Accounts tab 🔗' : '');
+  // Only show manual input if not linked to an account
+  document.getElementById('efInput').value = isLinked ? ef : (state.emergencyFund || '');
+  const inputRow = document.getElementById('efInput').closest('.flex');
+  if (inputRow) inputRow.style.opacity = isLinked ? '0.5' : '1';
+  if (inputRow) inputRow.title = isLinked ? 'Balance auto-synced from your Emergency Fund account — update the balance there' : '';
 }
 
 function renderDebtTable() {
@@ -3833,8 +4024,8 @@ function renderInvest() {
 }
 
 function renderInvestBanner() {
-  const ef       = state.emergencyFund || 0;
-  const fullEF   = state.fullEmergencyFund || 0;
+  const ef       = getEmergencyFundBalance();
+  const fullEF   = getFullEmergencyFundBalance();
   const goal     = state.fullEFGoal || 20000;
   const totalDebt = state.debts.reduce((s, d) => s + (parseFloat(d.balance)||0), 0);
   const step1Done = ef >= 1000;
@@ -3874,11 +4065,15 @@ function renderInvestBanner() {
 }
 
 function renderBS3Card() {
-  const balance = state.fullEmergencyFund || 0;
-  const goal    = state.fullEFGoal || 20000;
-  const pct     = Math.min(100, goal > 0 ? (balance / goal * 100) : 0);
-  const done    = balance >= goal;
-  const remain  = Math.max(0, goal - balance);
+  const balance  = getFullEmergencyFundBalance();
+  const goal     = state.fullEFGoal || 20000;
+  const pct      = Math.min(100, goal > 0 ? (balance / goal * 100) : 0);
+  const done     = balance >= goal;
+  const remain   = Math.max(0, goal - balance);
+  const isLinked = (state.bankAccounts||[]).some(a =>
+    (a.name||'').toLowerCase().includes('emergency fund') ||
+    (a.nickname||'').toLowerCase().includes('emergency fund')
+  );
 
   document.getElementById('bs3Card').innerHTML = `
     <div class="flex items-center justify-between gap-4 flex-wrap mb-3">
@@ -3888,6 +4083,7 @@ function renderBS3Card() {
           <span class="text-3xl num fw-700 ${done ? 'text-green' : 'text-teal'}">${fmt(balance, 0)}</span>
           <span class="text-dim text-sm">of <span class="num fw-600">${fmt(goal, 0)}</span> goal</span>
           ${done ? '<span class="badge badge-green">✓ Complete!</span>' : ''}
+          ${isLinked ? '<span class="badge badge-teal" style="font-size:0.65rem">🔗 Auto from Accounts</span>' : ''}
         </div>
         <div class="text-sm text-dim mt-1">${done ? 'Baby Step 3 done — ready for full investing mode!' : `${fmt(remain, 0)} remaining · ${pct.toFixed(0)}% funded`}</div>
       </div>
@@ -4143,7 +4339,8 @@ function renderInvestTable() {
     return;
   }
 
-  tbody.innerHTML = accts.map(a => {
+  const sortedAccts = sortData(accts, 'bankAcctTable', { name: 'name', bank: 'bank', type: 'type', currency: 'currency', balance: a => acctToCAD(parseFloat(a.balance)||0, a.currency) });
+  tbody.innerHTML = sortedAccts.map(a => {
     const contrib  = parseFloat(m.investContribs?.[a.id]) || 0;
     const balance  = parseFloat(a.balance) || 0;
     const target   = parseFloat(a.target)  || 0;
@@ -4482,6 +4679,7 @@ function renderAccounts() {
   renderAcctSummary();
   renderAcctTable();
   renderAcctFxNote();
+  renderTransfers();
 }
 
 function renderAcctSummary() {
@@ -4529,7 +4727,8 @@ function renderAcctTable() {
   }
 
   let totalCAD = 0;
-  tbody.innerHTML = accts.map(a => {
+  const sortedInvest = sortData(accts, 'investTable', { type: 'type', institution: 'institution', balance: a => toCAD(parseFloat(a.balance)||0, a.currency||'CAD'), target: 'target' });
+  tbody.innerHTML = sortedInvest.map(a => {
     const balance  = parseFloat(a.balance) || 0;
     const currency = a.currency || 'CAD';
     const cadVal   = acctToCAD(balance, currency);
@@ -4600,11 +4799,20 @@ function updateBankAcctBalance(id, val) {
     a.balance = parseFloat(val) || 0;
     saveData();
     renderAcctSummary(); renderAcctFxNote();
-    // Auto-route Splitwise to correct tab
+    // If this is an emergency fund account, refresh BS progress bars
+    const isEF = (a.name||'').toLowerCase().includes('emergency fund') ||
+                 (a.nickname||'').toLowerCase().includes('emergency fund');
+    if (isEF) {
+      renderBabySteps();
+      if (activeTab === 'debt')   renderEmergencyFund();
+      if (activeTab === 'invest') { renderBS3Card(); renderInvestBanner(); }
+    }
+    // Auto-route Splitwise
     if (a.type === 'Splitwise') {
       if (activeTab === 'income') renderReceivables();
       if (activeTab === 'debt')   { renderSplitweDebt(); renderDebtTable(); }
     }
+    if (activeTab === 'home') renderHome();
   }
 }
 
@@ -4672,6 +4880,183 @@ function deleteBankAcct(id) {
 }
 
 /* ============================================================
+   AUTO TRANSFERS
+   ============================================================ */
+function getTransferPaymentsThisMonth(t) {
+  // How many times does this transfer fire in the current month?
+  if (t.freq === 'monthly') return t.active ? 1 : 0;
+  if (t.freq === 'biweekly') {
+    // Use the same count as the car payment bi-weekly setting
+    const m = getMonth(currentMonth);
+    return t.active ? (m.biweekly?.['car_payment']?.count || 2) : 0;
+  }
+  if (t.freq === 'weekly') {
+    const m = getMonth(currentMonth);
+    return t.active ? (m.biweekly?.['car_payment']?.count || 4) : 0;
+  }
+  if (t.freq === 'perPaycheck') return t.active ? 2 : 0;
+  return 0;
+}
+
+function renderTransfers() {
+  const transfers = state.autoTransfers || [];
+  const ym = currentMonth;
+
+  // Summary cards
+  const totalMonth = transfers.reduce((s, t) => s + (t.amount * getTransferPaymentsThisMonth(t)), 0);
+  const toWS       = transfers.filter(t => t.to.toLowerCase().includes('wealthsimple'))
+                              .reduce((s, t) => s + (t.amount * getTransferPaymentsThisMonth(t)), 0);
+  const year       = ym.split('-')[0];
+  let ytdTotal = 0;
+  for (let mo = 1; mo <= parseInt(ym.split('-')[1]); mo++) {
+    const mk = `${year}-${String(mo).padStart(2,'0')}`;
+    transfers.forEach(t => { ytdTotal += t.amount * getTransferPaymentsThisMonth(t); });
+  }
+
+  const summaryEl = document.getElementById('transferSummaryCards');
+  if (summaryEl) summaryEl.innerHTML = transfers.length === 0 ? '' : `
+    <div class="metric-card teal">
+      <div class="metric-label">Total Transferred This Month</div>
+      <div class="metric-value num text-teal">${fmt(totalMonth, 0)}</div>
+      <div class="metric-sub">${transfers.filter(t=>t.active).length} active transfer${transfers.filter(t=>t.active).length !== 1 ? 's' : ''}</div>
+    </div>
+    <div class="metric-card orange">
+      <div class="metric-label">→ Wealthsimple This Month</div>
+      <div class="metric-value num">${fmt(toWS, 0)}</div>
+      <div class="metric-sub">into savings/investments</div>
+    </div>
+    <div class="metric-card teal">
+      <div class="metric-label">YTD Transferred</div>
+      <div class="metric-value num text-teal">${fmt(ytdTotal, 0)}</div>
+      <div class="metric-sub">${year} year to date</div>
+    </div>
+  `;
+
+  // Table
+  const tbody = document.getElementById('transferBody');
+  if (!tbody) return;
+
+  if (transfers.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="8" class="no-data-msg">No auto transfers — click "+ Add Transfer"</td></tr>';
+    document.getElementById('transferMonthTotal').textContent = '$0';
+    return;
+  }
+
+  const sortedTransfers = sortData(transfers, 'transferTable', { name: 'name', from: 'from', to: 'to', amount: 'amount', freq: 'freq' });
+  tbody.innerHTML = sortedTransfers.map(t => {
+    const pmts = getTransferPaymentsThisMonth(t);
+    const monthTotal = t.amount * pmts;
+
+    const freqLabel = t.freq === 'biweekly' ? 'Bi-weekly'
+                    : t.freq === 'monthly'  ? 'Monthly'
+                    : t.freq === 'weekly'   ? 'Weekly'
+                    : 'Per Paycheck';
+
+    const triggerLabel = t.triggerType === 'linkedDebt'
+      ? '📅 Same day as car payment'
+      : t.triggerType === 'date'
+        ? `📅 ${t.triggerDay ? ordinal(t.triggerDay) + ' of month' : '—'}`
+        : '📅 Day of paycheck';
+
+    return `<tr>
+      <td>
+        <div class="fw-600">${t.name}</div>
+        ${t.notes ? `<div class="text-xs text-muted mt-1">${t.notes}</div>` : ''}
+      </td>
+      <td class="text-sm text-dim">${t.from}</td>
+      <td class="text-sm fw-600 text-teal">${t.to}</td>
+      <td class="td-num text-orange fw-700">${fmt(t.amount)}</td>
+      <td><span class="badge badge-muted">${freqLabel}</span></td>
+      <td class="text-xs text-dim">${triggerLabel}</td>
+      <td class="td-num">
+        ${monthTotal > 0
+          ? `<div class="num fw-700 text-teal">${fmt(monthTotal, 0)}</div>
+             <div class="text-xs text-muted">${pmts}× this month</div>`
+          : '<span class="text-muted text-xs">—</span>'}
+      </td>
+      <td style="text-align:right;white-space:nowrap">
+        <label class="toggle" title="${t.active ? 'Disable' : 'Enable'}">
+          <input type="checkbox" ${t.active ? 'checked' : ''} onchange="toggleTransfer('${t.id}',this.checked)" />
+          <div class="toggle-track"></div><div class="toggle-thumb"></div>
+        </label>
+        <button class="btn btn-ghost btn-sm" onclick="openTransferModal('${t.id}')">✏️</button>
+        <button class="btn btn-danger btn-sm" onclick="deleteTransfer('${t.id}')">🗑</button>
+      </td>
+    </tr>`;
+  }).join('');
+
+  document.getElementById('transferMonthTotal').textContent = fmt(totalMonth, 0);
+}
+
+function ordinal(n) {
+  const s = ['th','st','nd','rd'], v = n % 100;
+  return n + (s[(v-20)%10] || s[v] || s[0]);
+}
+
+function toggleTransfer(id, active) {
+  const t = (state.autoTransfers||[]).find(x => x.id === id);
+  if (t) { t.active = active; saveData(); renderTransfers(); }
+}
+
+function deleteTransfer(id) {
+  state.autoTransfers = (state.autoTransfers||[]).filter(x => x.id !== id);
+  saveData(); renderTransfers();
+}
+
+function updateTransferTriggerUI() {
+  const freq    = document.getElementById('transferFreq')?.value;
+  const trigger = document.getElementById('transferTriggerType')?.value;
+  const dayWrap = document.getElementById('transferDayWrap');
+  if (dayWrap) dayWrap.style.display = trigger === 'date' ? '' : 'none';
+}
+
+let editingTransferId = null;
+function openTransferModal(id) {
+  editingTransferId = id || null;
+  const t = id ? (state.autoTransfers||[]).find(x => x.id === id) : null;
+  document.getElementById('transferModalTitle').textContent = t ? 'Edit Transfer' : 'Add Auto Transfer';
+  document.getElementById('transferName').value        = t?.name        || '';
+  document.getElementById('transferFrom').value        = t?.from        || '';
+  document.getElementById('transferTo').value          = t?.to          || '';
+  document.getElementById('transferAmount').value      = t?.amount      || '';
+  document.getElementById('transferFreq').value        = t?.freq        || 'biweekly';
+  document.getElementById('transferTriggerType').value = t?.triggerType || 'linkedDebt';
+  document.getElementById('transferDay').value         = t?.triggerDay  || '';
+  document.getElementById('transferNotes').value       = t?.notes       || '';
+  document.getElementById('transferEditId').value      = id || '';
+  updateTransferTriggerUI();
+  document.getElementById('transferModal').classList.add('open');
+  document.getElementById('transferName').focus();
+}
+
+function saveTransfer() {
+  const name = document.getElementById('transferName').value.trim();
+  if (!name) { toast('Enter a transfer name', 'error'); return; }
+  const entry = {
+    id:          editingTransferId || uid(),
+    name,
+    from:        document.getElementById('transferFrom').value.trim(),
+    to:          document.getElementById('transferTo').value.trim(),
+    amount:      parseFloat(document.getElementById('transferAmount').value) || 0,
+    freq:        document.getElementById('transferFreq').value,
+    triggerType: document.getElementById('transferTriggerType').value,
+    triggerDay:  parseInt(document.getElementById('transferDay').value) || null,
+    notes:       document.getElementById('transferNotes').value.trim(),
+    active:      true,
+  };
+  if (!state.autoTransfers) state.autoTransfers = [];
+  if (editingTransferId) {
+    const idx = state.autoTransfers.findIndex(x => x.id === editingTransferId);
+    if (idx >= 0) { entry.active = state.autoTransfers[idx].active; state.autoTransfers[idx] = entry; }
+  } else {
+    state.autoTransfers.push(entry);
+  }
+  closeModal('transferModal');
+  saveData(); renderTransfers();
+  toast('Transfer saved', 'success');
+}
+
+/* ============================================================
    UPCOMING TAB
    ============================================================ */
 const PRIORITY_BADGE = { High: 'badge-red', Medium: 'badge-yellow', Low: 'badge-teal' };
@@ -4679,7 +5064,8 @@ const STATUS_BADGE   = { Pending: 'badge-muted', Saving: 'badge-orange', Done: '
 
 function renderUpcoming() {
   const items = state.upcoming || [];
-  const sorted = [...items].sort((a, b) => {
+  let sorted = sortData(items, 'upcomingTable', { name: 'name', cost: 'cost', due: 'due', category: 'category', priority: a => ({'High':0,'Medium':1,'Low':2}[a.priority]||1), status: 'status' });
+  if (!sortState['upcomingTable']) sorted = sorted.sort((a, b) => {
     const pOrder = { High: 0, Medium: 1, Low: 2 };
     return (pOrder[a.priority] || 1) - (pOrder[b.priority] || 1);
   });
@@ -4969,6 +5355,12 @@ function bindEvents() {
   document.getElementById('bankAcctModalCancel').addEventListener('click', () => closeModal('bankAcctModal'));
   document.getElementById('bankAcctModalSave').addEventListener('click', saveBankAcct);
 
+  // Auto Transfers
+  document.getElementById('addTransferBtn').addEventListener('click', () => openTransferModal(null));
+  document.getElementById('transferModalClose').addEventListener('click', () => closeModal('transferModal'));
+  document.getElementById('transferModalCancel').addEventListener('click', () => closeModal('transferModal'));
+  document.getElementById('transferModalSave').addEventListener('click', saveTransfer);
+
   // Upcoming
   document.getElementById('addUpcomingBtn').addEventListener('click', () => openUpcomingModal(null));
   document.getElementById('upcomingModalClose').addEventListener('click', () => closeModal('upcomingModal'));
@@ -5057,215 +5449,7 @@ function init() {
   }
 }
 
-/* ============================================================
-   TOTP ENGINE — Google Authenticator compatible
-   ============================================================ */
-const TOTP = {
-  // Base32 alphabet
-  B32: 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567',
-
-  // Generate a random Base32 secret (20 bytes = 160 bits)
-  generateSecret() {
-    const bytes = new Uint8Array(20);
-    crypto.getRandomValues(bytes);
-    let out = '';
-    for (let i = 0; i < bytes.length; i += 5) {
-      const b = [bytes[i]||0, bytes[i+1]||0, bytes[i+2]||0, bytes[i+3]||0, bytes[i+4]||0];
-      out += this.B32[(b[0] >> 3) & 31];
-      out += this.B32[((b[0] << 2) | (b[1] >> 6)) & 31];
-      out += this.B32[(b[1] >> 1) & 31];
-      out += this.B32[((b[1] << 4) | (b[2] >> 4)) & 31];
-      out += this.B32[((b[2] << 1) | (b[3] >> 7)) & 31];
-      out += this.B32[(b[3] >> 2) & 31];
-      out += this.B32[((b[3] << 3) | (b[4] >> 5)) & 31];
-      out += this.B32[b[4] & 31];
-    }
-    return out.slice(0, 32); // 32 chars = 160 bits
-  },
-
-  // Decode Base32 secret to Uint8Array
-  decodeBase32(s) {
-    s = s.toUpperCase().replace(/[^A-Z2-7]/g, '');
-    const bytes = [];
-    let buf = 0, bitsLeft = 0;
-    for (const c of s) {
-      buf = (buf << 5) | this.B32.indexOf(c);
-      bitsLeft += 5;
-      if (bitsLeft >= 8) { bitsLeft -= 8; bytes.push((buf >> bitsLeft) & 0xff); }
-    }
-    return new Uint8Array(bytes);
-  },
-
-  // Generate TOTP code (async — uses Web Crypto API)
-  async generate(secret, offset = 0) {
-    const key   = this.decodeBase32(secret);
-    const count = Math.floor(Date.now() / 1000 / 30) + offset;
-    const msg   = new Uint8Array(8);
-    let c = count;
-    for (let i = 7; i >= 0; i--) { msg[i] = c & 0xff; c >>= 8; }
-
-    const cryptoKey = await crypto.subtle.importKey(
-      'raw', key, { name: 'HMAC', hash: 'SHA-1' }, false, ['sign']
-    );
-    const sig = new Uint8Array(await crypto.subtle.sign('HMAC', cryptoKey, msg));
-
-    const off  = sig[19] & 0xf;
-    const code = ((sig[off] & 0x7f) << 24 | sig[off+1] << 16 | sig[off+2] << 8 | sig[off+3]) % 1_000_000;
-    return String(code).padStart(6, '0');
-  },
-
-  // Verify — check current window + ±1 step for clock drift
-  async verify(secret, input) {
-    for (const offset of [0, -1, 1]) {
-      if (await this.generate(secret, offset) === input) return true;
-    }
-    return false;
-  }
-};
-
-/* ============================================================
-   LOCK SCREEN CONTROLLER
-   ============================================================ */
-const LS_SECRET_KEY = 'financeos_totp_secret';
-const SESSION_KEY   = 'financeos_unlocked';
-
-let lockTimerInterval = null;
-
-function getStoredSecret() { return localStorage.getItem(LS_SECRET_KEY); }
-
-function showLockScreen() {
-  const secret = getStoredSecret();
-  if (!secret) {
-    // First time — show setup
-    const newSecret = TOTP.generateSecret();
-    localStorage.setItem(LS_SECRET_KEY, newSecret);
-    document.getElementById('setupSecretDisplay').textContent = newSecret.match(/.{1,4}/g).join(' ');
-    document.getElementById('setupView').style.display = '';
-    document.getElementById('authView').style.display  = 'none';
-  } else {
-    // Returning — show auth
-    document.getElementById('authView').style.display  = '';
-    document.getElementById('setupView').style.display = 'none';
-    startLockTimer();
-    focusFirstOtp();
-  }
-  document.getElementById('lockScreen').style.display = 'flex';
-}
-
-function hideLockScreen() {
-  sessionStorage.setItem(SESSION_KEY, '1');
-  const ls = document.getElementById('lockScreen');
-  ls.style.transition = 'opacity 0.4s';
-  ls.style.opacity = '0';
-  setTimeout(() => { ls.style.display = 'none'; ls.style.opacity = '1'; }, 420);
-}
-
-function startLockTimer() {
-  clearInterval(lockTimerInterval);
-  function tick() {
-    const secs = 30 - (Math.floor(Date.now()/1000) % 30);
-    const el = document.getElementById('lockTimerDisplay');
-    if (el) el.textContent = secs;
-  }
-  tick();
-  lockTimerInterval = setInterval(tick, 1000);
-}
-
-function focusFirstOtp() {
-  const boxes = document.querySelectorAll('.otp-box');
-  if (boxes[0]) boxes[0].focus();
-}
-
-function getOtpValue() {
-  return [...document.querySelectorAll('.otp-box')].map(b => b.value).join('');
-}
-
-function clearOtp() {
-  document.querySelectorAll('.otp-box').forEach(b => { b.value = ''; b.classList.remove('filled','error'); });
-  focusFirstOtp();
-}
-
-function showOtpError(msg) {
-  document.getElementById('lockError').textContent = msg;
-  document.querySelectorAll('.otp-box').forEach(b => b.classList.add('error'));
-  setTimeout(() => {
-    document.querySelectorAll('.otp-box').forEach(b => b.classList.remove('error'));
-    document.getElementById('lockError').textContent = '';
-    clearOtp();
-  }, 1200);
-}
-
-async function attemptUnlock() {
-  const code = getOtpValue();
-  if (code.length !== 6) { showOtpError('Enter all 6 digits'); return; }
-  const secret = getStoredSecret();
-  const valid  = await TOTP.verify(secret, code);
-  if (valid) {
-    clearInterval(lockTimerInterval);
-    hideLockScreen();
-  } else {
-    showOtpError('Incorrect code — try again');
-  }
-}
-
-function bindLockScreen() {
-  // OTP box navigation
-  document.querySelectorAll('.otp-box').forEach((box, idx, all) => {
-    box.addEventListener('input', e => {
-      const v = e.target.value.replace(/[^0-9]/g,'');
-      e.target.value = v ? v[v.length-1] : '';
-      if (v && idx < 5) { all[idx+1].focus(); all[idx+1].select(); }
-      box.classList.toggle('filled', !!e.target.value);
-      // Auto-submit when all 6 filled
-      if (getOtpValue().length === 6) attemptUnlock();
-    });
-    box.addEventListener('keydown', e => {
-      if (e.key === 'Backspace' && !box.value && idx > 0) {
-        all[idx-1].focus(); all[idx-1].value = ''; all[idx-1].classList.remove('filled');
-      }
-      if (e.key === 'Enter') attemptUnlock();
-    });
-    box.addEventListener('paste', e => {
-      e.preventDefault();
-      const digits = (e.clipboardData.getData('text')||'').replace(/[^0-9]/g,'').slice(0,6);
-      [...digits].forEach((d, i) => { if(all[i]){ all[i].value=d; all[i].classList.add('filled'); } });
-      if (digits.length === 6) attemptUnlock();
-      else if (all[digits.length]) all[digits.length].focus();
-    });
-  });
-
-  document.getElementById('unlockBtn').addEventListener('click', attemptUnlock);
-
-  document.getElementById('setupDoneBtn').addEventListener('click', () => {
-    document.getElementById('authView').style.display  = '';
-    document.getElementById('setupView').style.display = 'none';
-    startLockTimer();
-    focusFirstOtp();
-  });
-
-  document.getElementById('resetAuthBtn').addEventListener('click', () => {
-    if (confirm('This will delete your TOTP secret and show the setup screen again. You will need to re-add FinanceOS to your Authenticator app. Continue?')) {
-      localStorage.removeItem(LS_SECRET_KEY);
-      sessionStorage.removeItem(SESSION_KEY);
-      location.reload();
-    }
-  });
-}
-
-document.addEventListener('DOMContentLoaded', () => {
-  bindLockScreen();
-  // Skip lock if already unlocked this session
-  if (sessionStorage.getItem(SESSION_KEY) === '1') {
-    document.getElementById('lockScreen').style.display = 'none';
-    init();
-  } else {
-    showLockScreen();
-    // Init app in background so it's ready when unlocked
-    init();
-  }
-});
-
-// Override the original DOMContentLoaded — replaced above
+document.addEventListener('DOMContentLoaded', init);
 </script>
 </body>
 </html>
