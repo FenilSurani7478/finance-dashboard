@@ -901,6 +901,15 @@ input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; marg
         </div>
       </div>
 
+      <!-- Government Benefits -->
+      <div class="section">
+        <div class="section-header">
+          <h2>🏛️ Government Benefits</h2>
+          <button class="btn btn-primary btn-sm" id="addBenefitBtn">+ Add Benefit</button>
+        </div>
+        <div class="card" id="benefitsCard"></div>
+      </div>
+
       <!-- Pay Schedules -->
       <div class="section">
         <div class="section-header">
@@ -1753,6 +1762,43 @@ input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; marg
   </div>
 </div>
 
+<!-- Add Government Benefit Modal -->
+<div class="modal-overlay" id="benefitModal">
+  <div class="modal" style="max-width:440px">
+    <div class="modal-header">
+      <h2 id="benefitModalTitle">Add Government Benefit</h2>
+      <button class="btn btn-ghost btn-icon" id="benefitModalClose">✕</button>
+    </div>
+    <div class="grid-2 gap-3">
+      <div class="form-group" style="grid-column:1/-1">
+        <label class="form-label">Benefit Name</label>
+        <input type="text" class="form-input" id="benefitName" placeholder="e.g. Trillium Benefit, GST/HST Credit…" />
+      </div>
+      <div class="form-group">
+        <label class="form-label">Amount ($)</label>
+        <input type="number" class="form-input num-input" id="benefitAmount" placeholder="0.00" min="0" step="0.01" />
+      </div>
+      <div class="form-group">
+        <label class="form-label">Frequency</label>
+        <select class="form-select" id="benefitFreq">
+          <option value="monthly">Monthly</option>
+          <option value="quarterly">Quarterly (every 4 months)</option>
+          <option value="annual">Annual (once a year)</option>
+        </select>
+      </div>
+      <div class="form-group" style="grid-column:1/-1">
+        <label class="form-label">Notes (optional)</label>
+        <input type="text" class="form-input" id="benefitNotes" placeholder="e.g. Stops if employed full-time…" />
+      </div>
+    </div>
+    <input type="hidden" id="benefitEditId" />
+    <div class="modal-actions">
+      <button class="btn btn-secondary" id="benefitModalCancel">Cancel</button>
+      <button class="btn btn-primary" id="benefitModalSave">Save</button>
+    </div>
+  </div>
+</div>
+
 <!-- Add Bank Account Modal -->
 <div class="modal-overlay" id="bankAcctModal">
   <div class="modal" style="max-width:480px">
@@ -2030,6 +2076,10 @@ let state = {
   fullEFGoal: 20000,     // user-set goal ($20k–$40k range)
   bankAccounts: [],      // [{ id, name, bank, type, currency, balance, notes }]
   autoTransfers: [],
+  govBenefits: [
+    { id: 'ben_trillium', name: 'Trillium Benefit',  amount: 70,  freq: 'monthly',   active: true,  notes: 'Ontario Trillium Benefit — monthly' },
+    { id: 'ben_gst',      name: 'GST/HST Credit',    amount: 100, freq: 'quarterly', active: true,  notes: 'Every 4 months — mark received when it arrives' },
+  ],
   budgetDefaults: {},   // { 'fixed:catId': amount, 'variable:catId': amount } — carries forward to all months
   obnSchedule: { freq: 'biweekly', dayOfWeek: 'Thursday', occurrence: 2 },
   gigSchedules: {
@@ -2556,7 +2606,15 @@ function calcMonthTotals(ym) {
     varActual  += parseFloat(m.variable?.[cat.id]?.actual)   || 0;
   }
 
-  const totalIncome  = obnTotal + gigTotal;
+  // Government Benefits
+  let benefitsTotal = 0;
+  for (const b of (state.govBenefits||[])) {
+    if (!b.active) continue;
+    if (b.freq === 'monthly') benefitsTotal += parseFloat(b.amount)||0;
+    else if (m[`benefit_received_${b.id}`]) benefitsTotal += parseFloat(b.amount)||0;
+  }
+
+  const totalIncome  = obnTotal + gigTotal + benefitsTotal;
   const totalExpense = fixedActual + varActual;
   const net          = totalIncome - totalExpense;
 
@@ -2566,7 +2624,7 @@ function calcMonthTotals(ym) {
     debtPayment += (parseFloat(m.debtPayments?.[d.id]?.extra) || 0) + (parseFloat(d.minimum) || 0);
   }
 
-  return { obnTotal, gigTotal, totalIncome, fixedBudget, fixedActual, varBudget, varActual, totalExpense, net, debtPayment };
+  return { obnTotal, gigTotal, benefitsTotal, totalIncome, fixedBudget, fixedActual, varBudget, varActual, totalExpense, net, debtPayment };
 }
 
 function getAllFixedCats(includeHidden = false) {
@@ -3366,9 +3424,141 @@ function renderSplitweDebt() {
     </div>`;
 }
 
+/* ============================================================
+   GOVERNMENT BENEFITS
+   ============================================================ */
+function renderBenefits() {
+  const el = document.getElementById('benefitsCard');
+  if (!el) return;
+  const benefits = state.govBenefits || [];
+  const m = getMonth(currentMonth);
+
+  if (benefits.length === 0) {
+    el.innerHTML = '<div class="no-data-msg">No benefits added — click "+ Add Benefit"</div>';
+    return;
+  }
+
+  const freqLabel = { monthly: 'Monthly', quarterly: 'Quarterly', annual: 'Annual' };
+
+  // Total this month from benefits
+  let totalThisMonth = 0;
+  benefits.forEach(b => {
+    if (!b.active) return;
+    if (b.freq === 'monthly') totalThisMonth += parseFloat(b.amount)||0;
+    else if (m[`benefit_received_${b.id}`]) totalThisMonth += parseFloat(b.amount)||0;
+  });
+
+  el.innerHTML = `
+    <p class="text-xs text-muted mb-3">
+      Monthly benefits are counted automatically. Quarterly/annual benefits — tick
+      <strong>Received</strong> in the month they arrive.
+    </p>
+    <div style="display:flex;flex-direction:column;gap:0.5rem">
+      ${benefits.map(b => {
+        const received = !!(m[`benefit_received_${b.id}`]);
+        const isMonthly = b.freq === 'monthly';
+        const amountCAD = parseFloat(b.amount)||0;
+
+        return `<div class="flex items-center justify-between gap-3 p-2 rounded"
+          style="background:var(--surface2);border-radius:var(--r);opacity:${b.active?1:0.5}">
+          <div style="flex:1">
+            <div class="flex items-center gap-2">
+              <span class="fw-600 text-sm">${b.name}</span>
+              <span class="badge badge-muted text-xs">${freqLabel[b.freq]||b.freq}</span>
+              ${!b.active ? '<span class="badge badge-red text-xs">Inactive</span>' : ''}
+            </div>
+            <div class="text-xs text-dim mt-1">${b.notes||''}</div>
+          </div>
+          <div class="flex items-center gap-2" style="flex-shrink:0">
+            <span class="num fw-700 text-green">${fmt(amountCAD)}</span>
+            ${isMonthly
+              ? '<span class="badge badge-green text-xs">Auto ✓</span>'
+              : `<label class="flex items-center gap-1 text-xs" style="cursor:pointer">
+                  <input type="checkbox" ${received?'checked':''} 
+                    onchange="toggleBenefitReceived('${b.id}',this.checked)" />
+                  <span class="${received?'text-green fw-700':'text-dim'}">
+                    ${received ? 'Received ✓' : 'Mark Received'}
+                  </span>
+                </label>`}
+            <label class="toggle" title="${b.active?'Disable':'Enable'}">
+              <input type="checkbox" ${b.active?'checked':''} onchange="toggleBenefit('${b.id}',this.checked)" />
+              <div class="toggle-track"></div><div class="toggle-thumb"></div>
+            </label>
+            <button class="btn btn-ghost btn-sm" onclick="openBenefitModal('${b.id}')">✏️</button>
+            <button class="btn btn-danger btn-sm" onclick="deleteBenefit('${b.id}')">🗑</button>
+          </div>
+        </div>`;
+      }).join('')}
+    </div>
+    <div class="flex items-center justify-between mt-3 pt-2" style="border-top:1px solid var(--border2)">
+      <span class="text-sm text-dim fw-700">Total Benefits This Month</span>
+      <span class="num fw-700 text-green">${fmt(totalThisMonth)}</span>
+    </div>
+  `;
+}
+
+function toggleBenefitReceived(id, checked) {
+  const m = getMonth(currentMonth);
+  if (checked) {
+    m[`benefit_received_${id}`] = true;
+  } else {
+    delete m[`benefit_received_${id}`];
+  }
+  saveData(); renderBenefits();
+  if (activeTab === 'home') renderHome();
+}
+
+function toggleBenefit(id, active) {
+  const b = (state.govBenefits||[]).find(x => x.id === id);
+  if (b) { b.active = active; saveData(); renderBenefits(); }
+}
+
+function deleteBenefit(id) {
+  state.govBenefits = (state.govBenefits||[]).filter(x => x.id !== id);
+  saveData(); renderBenefits();
+}
+
+let editingBenefitId = null;
+function openBenefitModal(id) {
+  editingBenefitId = id || null;
+  const b = id ? (state.govBenefits||[]).find(x => x.id === id) : null;
+  document.getElementById('benefitModalTitle').textContent = b ? 'Edit Benefit' : 'Add Government Benefit';
+  document.getElementById('benefitName').value   = b?.name   || '';
+  document.getElementById('benefitAmount').value = b?.amount || '';
+  document.getElementById('benefitFreq').value   = b?.freq   || 'monthly';
+  document.getElementById('benefitNotes').value  = b?.notes  || '';
+  document.getElementById('benefitEditId').value = id || '';
+  document.getElementById('benefitModal').classList.add('open');
+  document.getElementById('benefitName').focus();
+}
+
+function saveBenefit() {
+  const name = document.getElementById('benefitName').value.trim();
+  if (!name) { toast('Enter a benefit name', 'error'); return; }
+  const entry = {
+    id:     editingBenefitId || uid(),
+    name,
+    amount: parseFloat(document.getElementById('benefitAmount').value) || 0,
+    freq:   document.getElementById('benefitFreq').value,
+    notes:  document.getElementById('benefitNotes').value.trim(),
+    active: true,
+  };
+  if (!state.govBenefits) state.govBenefits = [];
+  if (editingBenefitId) {
+    const idx = state.govBenefits.findIndex(x => x.id === editingBenefitId);
+    if (idx >= 0) { entry.active = state.govBenefits[idx].active; state.govBenefits[idx] = entry; }
+  } else {
+    state.govBenefits.push(entry);
+  }
+  closeModal('benefitModal');
+  saveData(); renderBenefits();
+  toast('Benefit saved', 'success');
+}
+
 function renderIncome() {
   renderOBN();
   renderGig();
+  renderBenefits();
   renderPaySchedules();
   renderReceivables();
 }
@@ -5861,6 +6051,12 @@ function bindEvents() {
   document.getElementById('bankAcctModalClose').addEventListener('click', () => closeModal('bankAcctModal'));
   document.getElementById('bankAcctModalCancel').addEventListener('click', () => closeModal('bankAcctModal'));
   document.getElementById('bankAcctModalSave').addEventListener('click', saveBankAcct);
+
+  // Government Benefits
+  document.getElementById('addBenefitBtn').addEventListener('click', () => openBenefitModal(null));
+  document.getElementById('benefitModalClose').addEventListener('click', () => closeModal('benefitModal'));
+  document.getElementById('benefitModalCancel').addEventListener('click', () => closeModal('benefitModal'));
+  document.getElementById('benefitModalSave').addEventListener('click', saveBenefit);
 
   // Auto Transfers
   document.getElementById('addTransferBtn').addEventListener('click', () => openTransferModal(null));
