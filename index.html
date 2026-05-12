@@ -5425,12 +5425,7 @@ function renderTransfers() {
   const totalMonth = transfers.reduce((s, t) => s + (t.amount * getTransferPaymentsThisMonth(t)), 0);
   const toWS       = transfers.filter(t => t.to.toLowerCase().includes('wealthsimple'))
                               .reduce((s, t) => s + (t.amount * getTransferPaymentsThisMonth(t)), 0);
-  const year       = ym.split('-')[0];
-  let ytdTotal = 0;
-  for (let mo = 1; mo <= parseInt(ym.split('-')[1]); mo++) {
-    const mk = `${year}-${String(mo).padStart(2,'0')}`;
-    transfers.forEach(t => { ytdTotal += t.amount * getTransferPaymentsThisMonth(t); });
-  }
+  const year = ym.split('-')[0];
 
   const summaryEl = document.getElementById('transferSummaryCards');
   if (summaryEl) summaryEl.innerHTML = transfers.length === 0 ? '' : `
@@ -5443,11 +5438,6 @@ function renderTransfers() {
       <div class="metric-label">→ Wealthsimple This Month</div>
       <div class="metric-value num">${fmt(toWS, 0)}</div>
       <div class="metric-sub">into savings/investments</div>
-    </div>
-    <div class="metric-card teal">
-      <div class="metric-label">YTD Transferred</div>
-      <div class="metric-value num text-teal">${fmt(ytdTotal, 0)}</div>
-      <div class="metric-sub">${year} year to date</div>
     </div>
   `;
 
