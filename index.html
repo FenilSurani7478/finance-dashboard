@@ -804,6 +804,15 @@ input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; marg
         </div>
       </div>
 
+      <!-- Cash Flow Calendar -->
+      <div class="card mb-4">
+        <div class="card-header">
+          <h3>📅 This Month's Cash Flow</h3>
+          <span class="text-xs text-dim" id="calendarMonthLabel"></span>
+        </div>
+        <div id="monthCalendar"></div>
+      </div>
+
       <!-- Interest Tracking -->
       <div class="grid-2 gap-4 mb-4">
         <div class="card">
@@ -890,6 +899,15 @@ input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; marg
             </table>
           </div>
         </div>
+      </div>
+
+      <!-- Pay Schedules -->
+      <div class="section">
+        <div class="section-header">
+          <h2>📅 Pay Schedules</h2>
+          <span class="text-xs text-dim">Set when each income source pays you</span>
+        </div>
+        <div class="card" id="paySchedulesCard"></div>
       </div>
 
       <!-- Receivables (auto-populated from Splitwise positive balances) -->
@@ -1544,6 +1562,33 @@ input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; marg
       </div>
     </div>
 
+    <!-- Payment Due Schedule -->
+    <div style="margin-top:0.75rem;padding-top:0.75rem;border-top:1px solid var(--border2)">
+      <div class="form-label mb-2">📅 Payment Due Schedule <span class="text-muted" style="font-weight:400;text-transform:none;letter-spacing:0">(optional — for cash flow calendar)</span></div>
+      <div class="flex gap-2 flex-wrap">
+        <select class="form-select" id="debtSchedFreq" onchange="updateDebtSchedUI()" style="flex:1;min-width:110px">
+          <option value="">Not set</option>
+          <option value="monthly">Monthly</option>
+          <option value="biweekly">Bi-weekly</option>
+          <option value="weekly">Weekly</option>
+        </select>
+        <!-- Monthly: day of month -->
+        <input type="number" class="form-input num-input" id="debtSchedDate"
+          placeholder="Day (e.g. 18)" min="1" max="31"
+          style="flex:1;min-width:90px;display:none" />
+        <!-- Bi-weekly/Weekly: day of week -->
+        <select class="form-select" id="debtSchedDayOfWeek" style="flex:1;min-width:110px;display:none">
+          <option>Monday</option><option>Tuesday</option><option>Wednesday</option>
+          <option>Thursday</option><option>Friday</option><option>Saturday</option><option>Sunday</option>
+        </select>
+        <!-- Bi-weekly: which occurrence -->
+        <select class="form-select" id="debtSchedOccurrence" style="flex:1;min-width:90px;display:none">
+          <option value="1">1st</option><option value="2">2nd</option>
+          <option value="3">3rd</option><option value="4">4th</option>
+        </select>
+      </div>
+    </div>
+
     <input type="hidden" id="debtEditId" />
     <div class="modal-actions">
       <button class="btn btn-secondary" id="debtModalCancel">Cancel</button>
@@ -1641,55 +1686,66 @@ input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; marg
 
 <!-- Add Auto Transfer Modal -->
 <div class="modal-overlay" id="transferModal">
-  <div class="modal" style="max-width:480px">
+  <div class="modal" style="max-width:500px">
     <div class="modal-header">
       <h2 id="transferModalTitle">Add Auto Transfer</h2>
       <button class="btn btn-ghost btn-icon" id="transferModalClose">✕</button>
     </div>
     <div class="grid-2 gap-3">
+
       <div class="form-group" style="grid-column:1/-1">
         <label class="form-label">Transfer Name / Description</label>
-        <input type="text" class="form-input" id="transferName" placeholder="e.g. Savings Transfer, CTB Savings…" />
+        <input type="text" class="form-input" id="transferName" placeholder="e.g. Emergency Fund Savings, CTB Savings…" />
       </div>
+
       <div class="form-group">
         <label class="form-label">From Account</label>
-        <input type="text" class="form-input" id="transferFrom" placeholder="e.g. Tangerine, RBC…" />
+        <select class="form-select" id="transferFrom"></select>
       </div>
+
       <div class="form-group">
         <label class="form-label">To Account</label>
-        <input type="text" class="form-input" id="transferTo" placeholder="e.g. Wealthsimple TFSA…" />
+        <select class="form-select" id="transferTo"></select>
       </div>
+
       <div class="form-group">
         <label class="form-label">Amount ($)</label>
         <input type="number" class="form-input num-input" id="transferAmount" placeholder="0.00" min="0" step="0.01" />
       </div>
+
       <div class="form-group">
         <label class="form-label">Frequency</label>
         <select class="form-select" id="transferFreq" onchange="updateTransferTriggerUI()">
+          <option value="weekly">Weekly</option>
           <option value="biweekly">Bi-weekly</option>
           <option value="monthly">Monthly</option>
-          <option value="weekly">Weekly</option>
-          <option value="perPaycheck">Per Paycheck</option>
         </select>
       </div>
-      <div class="form-group" style="grid-column:1/-1" id="transferTriggerWrap">
-        <label class="form-label" id="transferTriggerLabel">Trigger</label>
-        <select class="form-select" id="transferTriggerType" onchange="updateTransferTriggerUI()">
-          <option value="linkedDebt">Same day as car payment</option>
-          <option value="date">Specific day of month</option>
-          <option value="paycheck">Day of paycheck</option>
-        </select>
+
+      <!-- Weekly / Bi-weekly trigger: day of week -->
+      <div class="form-group" style="grid-column:1/-1" id="transferDayOfWeekWrap">
+        <label class="form-label" id="transferTriggerLabel">Trigger Day</label>
+        <div class="flex gap-2 flex-wrap" id="transferDayOfWeekBtns">
+          <!-- Rendered by JS -->
+        </div>
       </div>
-      <div class="form-group" id="transferDayWrap" style="grid-column:1/-1;display:none">
-        <label class="form-label">Day of Month</label>
-        <input type="number" class="form-input num-input" id="transferDay" placeholder="e.g. 13" min="1" max="31" />
+
+      <!-- Monthly trigger: mini calendar -->
+      <div class="form-group" style="grid-column:1/-1;display:none" id="transferCalendarWrap">
+        <label class="form-label">Trigger Date — tap to select</label>
+        <div id="transferMiniCal" style="display:grid;grid-template-columns:repeat(7,1fr);gap:4px;max-width:320px"></div>
+        <div class="text-xs text-muted mt-2">Selected: <span id="transferCalSelected" class="text-orange fw-700">None</span></div>
       </div>
+
       <div class="form-group" style="grid-column:1/-1">
         <label class="form-label">Notes (optional)</label>
-        <input type="text" class="form-input" id="transferNotes" placeholder="e.g. Goes out with car payment, CTB savings…" />
+        <input type="text" class="form-input" id="transferNotes" placeholder="Optional note…" />
       </div>
+
     </div>
     <input type="hidden" id="transferEditId" />
+    <input type="hidden" id="transferDayOfWeek" value="Monday" />
+    <input type="hidden" id="transferDay" value="" />
     <div class="modal-actions">
       <button class="btn btn-secondary" id="transferModalCancel">Cancel</button>
       <button class="btn btn-primary" id="transferModalSave">Save</button>
@@ -1973,33 +2029,18 @@ let state = {
   fullEmergencyFund: 0,  // current BS3 balance
   fullEFGoal: 20000,     // user-set goal ($20k–$40k range)
   bankAccounts: [],      // [{ id, name, bank, type, currency, balance, notes }]
-  autoTransfers: [
-    {
-      id: 'at_savings',
-      name: 'Savings Transfer',
-      from: 'Tangerine',
-      to: 'Wealthsimple TFSA',
-      amount: 100,
-      freq: 'biweekly',
-      triggerType: 'linkedDebt',
-      triggerDay: null,
-      notes: 'Goes out same day as car payment (bi-weekly Tuesday)',
-      active: true,
-    },
-    {
-      id: 'at_ctb',
-      name: 'CTB Savings',
-      from: 'RBC',
-      to: 'Tangerine',
-      amount: 70,
-      freq: 'monthly',
-      triggerType: 'date',
-      triggerDay: 13,
-      notes: 'Government CTB ~$74–75 arrives around 10th, auto-transfer on 13th',
-      active: true,
-    },
-  ],
+  autoTransfers: [],
   budgetDefaults: {},   // { 'fixed:catId': amount, 'variable:catId': amount } — carries forward to all months
+  obnSchedule: { freq: 'biweekly', dayOfWeek: 'Thursday', occurrence: 2 },
+  gigSchedules: {
+    uber:        { freq: 'weekly',    dayOfWeek: 'Wednesday', occurrence: 1 },
+    uber_eats:   { freq: 'weekly',    dayOfWeek: 'Wednesday', occurrence: 1 },
+    lyft:        { freq: 'weekly',    dayOfWeek: 'Wednesday', occurrence: 1 },
+    hopp:        { freq: 'weekly',    dayOfWeek: 'Monday',    occurrence: 1 },
+    doordash:    { freq: 'weekly',    dayOfWeek: 'Wednesday', occurrence: 1 },
+    amazon_flex: { freq: 'weekly',    dayOfWeek: 'Wednesday', occurrence: 1 },
+    skip:        { freq: 'weekly',    dayOfWeek: 'Wednesday', occurrence: 1 },
+  },
   allocation: [           // target allocation slices
     { id: 'ca_eq',  label: 'Canadian Equity',       pct: 30 },
     { id: 'us_eq',  label: 'US Equity',             pct: 30 },
@@ -2655,6 +2696,280 @@ function sortData(data, tableId, colMap) {
   });
 }
 
+/* ============================================================
+   SCHEDULE & CASH FLOW CALENDAR
+   ============================================================ */
+const DAYS_OF_WEEK = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+const FREQ_LABELS  = { monthly: 'Monthly', biweekly: 'Bi-weekly', weekly: 'Weekly', '': 'Not set' };
+
+// Get all dates of a specific weekday in a month
+function getWeekdayDates(dayName, ym) {
+  const idx = DAYS_OF_WEEK.indexOf(dayName);
+  if (idx < 0) return [];
+  const [y, m] = ym.split('-').map(Number);
+  const daysInMonth = new Date(y, m, 0).getDate();
+  const dates = [];
+  for (let d = 1; d <= daysInMonth; d++) {
+    if (new Date(y, m-1, d).getDay() === idx) dates.push(d);
+  }
+  return dates;
+}
+
+// Get specific occurrence of a weekday (1st, 2nd, etc.)
+function getNthWeekday(dayName, n, ym) {
+  return getWeekdayDates(dayName, ym)[n-1] || null;
+}
+
+// Get all dates a schedule fires in a given month
+function getDatesForSchedule(sched, ym) {
+  if (!sched || !sched.freq) return [];
+  const [y, m] = ym.split('-').map(Number);
+  const daysInMonth = new Date(y, m, 0).getDate();
+
+  if (sched.freq === 'monthly') {
+    const d = parseInt(sched.dayOfMonth) || parseInt(sched.date);
+    if (!d) return [];
+    return [Math.min(d, daysInMonth)];
+  }
+  if (sched.freq === 'weekly') {
+    return getWeekdayDates(sched.dayOfWeek, ym);
+  }
+  if (sched.freq === 'biweekly') {
+    const all = getWeekdayDates(sched.dayOfWeek, ym);
+    // Return every other one starting from the specified occurrence
+    const start = (parseInt(sched.occurrence) || 2) - 1; // 0-indexed
+    return all.filter((_, i) => (i - start) % 2 === 0 && i >= start);
+  }
+  return [];
+}
+
+// Build all events for the current month
+function getMonthEvents(ym) {
+  const events = [];
+  const [y, mo] = ym.split('-').map(Number);
+  const m = getMonth(ym);
+
+  // OBN / Salary income
+  const obnSched = state.obnSchedule || {};
+  const obnDates = getDatesForSchedule({ ...obnSched, dayOfMonth: obnSched.dayOfMonth }, ym);
+  const obnTotal = (m.obn || []).reduce((s, p) => s + (parseFloat(p.amount)||0), 0);
+  const obnPerPay = obnSched.freq === 'biweekly'
+    ? (obnTotal / Math.max(1, obnDates.length || 2))
+    : obnTotal;
+  obnDates.forEach(d => events.push({
+    date: d, type: 'income', label: 'Salary (OBN)',
+    amount: obnPerPay, color: 'var(--orange)', icon: '💵'
+  }));
+
+  // Gig income
+  const activePlatforms = state.platforms.filter(p => state.platformsActive[p.id] !== false);
+  activePlatforms.forEach(p => {
+    const sched = state.gigSchedules?.[p.id] || { freq: 'weekly', dayOfWeek: 'Wednesday' };
+    const gigDates = getDatesForSchedule(sched, ym);
+    const gigNet = parseFloat(m.gig?.[p.id]?.net) || 0;
+    const perPay = gigNet / Math.max(1, gigDates.length || 1);
+    gigDates.forEach(d => events.push({
+      date: d, type: 'income', label: p.name + ' payout',
+      amount: perPay, color: 'var(--teal)', icon: '🚗'
+    }));
+  });
+
+  // Debt payments
+  state.debts.forEach(d => {
+    const sched = d.paySchedule;
+    if (!sched || !sched.freq) return;
+    const dates = getDatesForSchedule({
+      freq: sched.freq,
+      dayOfWeek: sched.dayOfWeek,
+      dayOfMonth: sched.dayOfMonth,
+      occurrence: sched.occurrence,
+    }, ym);
+    const minimum = parseFloat(d.minimum) || 0;
+    dates.forEach(dt => events.push({
+      date: dt, type: 'payment', label: d.name,
+      amount: minimum, color: 'var(--red)', icon: d.type === 'credit_card' ? '💳' : '🏦'
+    }));
+  });
+
+  // Auto transfers
+  (state.autoTransfers || []).filter(t => t.active).forEach(t => {
+    let dates = [];
+    if (t.freq === 'monthly' && t.triggerDay) {
+      const [y2, mo2] = ym.split('-').map(Number);
+      dates = [Math.min(t.triggerDay, new Date(y2, mo2, 0).getDate())];
+    } else if ((t.freq === 'weekly' || t.freq === 'biweekly') && t.triggerDayOfWeek) {
+      const allDates = getWeekdayDates(t.triggerDayOfWeek, ym);
+      dates = t.freq === 'biweekly' ? allDates.filter((_,i) => i % 2 === 1) : allDates;
+    }
+    dates.forEach(d => events.push({
+      date: d, type: 'transfer',
+      label: t.name + ' (' + t.from + ' → ' + t.to + ')',
+      amount: t.amount, color: 'var(--teal)', icon: '🔄'
+    }));
+  });
+
+  return events.sort((a, b) => a.date - b.date);
+}
+
+function renderMonthCalendar(ym) {
+  const events = getMonthEvents(ym);
+  const label = document.getElementById('calendarMonthLabel');
+  if (label) label.textContent = monthLabel(ym);
+
+  const el = document.getElementById('monthCalendar');
+  if (!el) return;
+
+  if (events.length === 0) {
+    el.innerHTML = '<div class="no-data-msg">No schedules set yet — add payment schedules to debts and income pay schedules to see your cash flow here.</div>';
+    return;
+  }
+
+  // Group by date
+  const byDate = {};
+  events.forEach(e => {
+    if (!byDate[e.date]) byDate[e.date] = [];
+    byDate[e.date].push(e);
+  });
+
+  const [y, mo] = ym.split('-').map(Number);
+  const daysInMonth = new Date(y, mo, 0).getDate();
+
+  let totalIncome = 0, totalPayments = 0;
+  events.forEach(e => {
+    if (e.type === 'income') totalIncome += e.amount;
+    else totalPayments += e.amount;
+  });
+
+  el.innerHTML = `
+    <div class="flex gap-4 mb-3 flex-wrap">
+      <div class="text-sm"><span class="text-dim">Expected Income: </span><span class="text-green fw-700 num">${fmt(totalIncome, 0)}</span></div>
+      <div class="text-sm"><span class="text-dim">Expected Payments: </span><span class="text-red fw-700 num">${fmt(totalPayments, 0)}</span></div>
+      <div class="text-sm"><span class="text-dim">Net: </span><span class="${totalIncome - totalPayments >= 0 ? 'text-green' : 'text-red'} fw-700 num">${fmtSigned(totalIncome - totalPayments)}</span></div>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:0.35rem">
+      ${Object.entries(byDate).map(([date, evts]) => {
+        const dayName = DAYS_OF_WEEK[new Date(y, mo-1, parseInt(date)).getDay()];
+        return `
+          <div style="display:flex;align-items:flex-start;gap:0.75rem;padding:0.5rem 0.6rem;background:var(--surface2);border-radius:var(--r);border-left:3px solid ${evts[0].color}">
+            <div style="min-width:52px;text-align:center">
+              <div class="num fw-700 text-sm">${String(date).padStart(2,'0')}</div>
+              <div class="text-xs text-muted">${dayName.slice(0,3)}</div>
+            </div>
+            <div style="flex:1;display:flex;flex-direction:column;gap:0.25rem">
+              ${evts.map(e => `
+                <div class="flex items-center justify-between">
+                  <span class="text-sm">${e.icon} ${e.label}</span>
+                  <span class="num fw-700 text-sm" style="color:${e.color}">${e.type === 'income' ? '+' : '-'}${fmt(e.amount, 0)}</span>
+                </div>
+              `).join('')}
+            </div>
+          </div>`;
+      }).join('')}
+    </div>
+  `;
+}
+
+/* ---- Debt schedule modal UI ---- */
+function updateDebtSchedUI() {
+  const freq = document.getElementById('debtSchedFreq')?.value;
+  const dateEl = document.getElementById('debtSchedDate');
+  const dayEl  = document.getElementById('debtSchedDayOfWeek');
+  const occEl  = document.getElementById('debtSchedOccurrence');
+  if (!dateEl) return;
+  dateEl.style.display = freq === 'monthly'   ? ''     : 'none';
+  dayEl.style.display  = freq && freq !== 'monthly' ? '' : 'none';
+  occEl.style.display  = freq === 'biweekly'  ? ''     : 'none';
+}
+
+/* ---- Pay Schedules section in Income tab ---- */
+function renderPaySchedules() {
+  const el = document.getElementById('paySchedulesCard');
+  if (!el) return;
+
+  const obn = state.obnSchedule || {};
+  const activePlatforms = state.platforms.filter(p => state.platformsActive[p.id] !== false);
+
+  const schedRow = (label, icon, sched, id, isGig) => {
+    const freq = sched?.freq || '';
+    const day  = sched?.dayOfWeek || 'Wednesday';
+    const occ  = sched?.occurrence || 1;
+    const dom  = sched?.dayOfMonth || '';
+    return `
+      <div class="mom-row" style="flex-wrap:wrap;gap:0.5rem">
+        <div class="flex items-center gap-2">
+          <span>${icon}</span>
+          <span class="fw-600 text-sm">${label}</span>
+        </div>
+        <div class="flex items-center gap-2 flex-wrap">
+          <select class="form-select form-input-sm" style="width:110px"
+            onchange="updatePaySched('${id}','freq',this.value,${isGig})">
+            <option value=""   ${!freq?'selected':''}>Not set</option>
+            <option value="weekly"    ${freq==='weekly'?'selected':''}>Weekly</option>
+            <option value="biweekly"  ${freq==='biweekly'?'selected':''}>Bi-weekly</option>
+            <option value="monthly"   ${freq==='monthly'?'selected':''}>Monthly</option>
+          </select>
+          ${freq && freq !== 'monthly' ? `
+            <select class="form-select form-input-sm" style="width:115px"
+              onchange="updatePaySched('${id}','dayOfWeek',this.value,${isGig})">
+              ${DAYS_OF_WEEK.slice(1).concat('Sunday').map(d =>
+                `<option ${d===day?'selected':''}>${d}</option>`
+              ).join('')}
+            </select>` : ''}
+          ${freq === 'biweekly' ? `
+            <select class="form-select form-input-sm" style="width:80px"
+              onchange="updatePaySched('${id}','occurrence',this.value,${isGig})">
+              ${[1,2,3,4].map(n =>
+                `<option value="${n}" ${n==occ?'selected':''}>${['1st','2nd','3rd','4th'][n-1]}</option>`
+              ).join('')}
+            </select>` : ''}
+          ${freq === 'monthly' ? `
+            <input type="number" class="form-input form-input-sm num-input" style="width:80px"
+              placeholder="Day" min="1" max="31" value="${dom||''}"
+              onchange="updatePaySched('${id}','dayOfMonth',this.value,${isGig})" />` : ''}
+          ${freq ? `<span class="badge badge-muted text-xs">${describeSchedule(sched)}</span>` : ''}
+        </div>
+      </div>`;
+  };
+
+  el.innerHTML = `
+    <p class="text-xs text-muted mb-3">Set when each income source pays you — used to build the Overview cash flow calendar.</p>
+    <div class="mb-1"><h4 style="font-size:0.72rem;color:var(--dim);text-transform:uppercase;letter-spacing:.06em;margin-bottom:0.5rem">Fixed Income</h4>
+      ${schedRow('OBN / Salary', '💼', obn, 'obn', false)}
+    </div>
+    <div class="mt-3"><h4 style="font-size:0.72rem;color:var(--dim);text-transform:uppercase;letter-spacing:.06em;margin-bottom:0.5rem">Gig Platforms</h4>
+      ${activePlatforms.map(p => {
+        const gs = state.gigSchedules?.[p.id] || {};
+        return schedRow(p.name, '🚗', gs, p.id, true);
+      }).join('')}
+    </div>
+  `;
+}
+
+function describeSchedule(sched) {
+  if (!sched?.freq) return '';
+  if (sched.freq === 'monthly') return `${sched.dayOfMonth ? ordinal(sched.dayOfMonth) + ' of month' : 'monthly'}`;
+  if (sched.freq === 'weekly') return `Every ${sched.dayOfWeek || 'day'}`;
+  if (sched.freq === 'biweekly') {
+    const occ = ['1st','2nd','3rd','4th'][parseInt(sched.occurrence||2)-1] || '2nd';
+    return `Every 2nd ${sched.dayOfWeek || 'day'} (${occ})`;
+  }
+  return '';
+}
+
+function updatePaySched(id, field, value, isGig) {
+  if (id === 'obn') {
+    if (!state.obnSchedule) state.obnSchedule = {};
+    state.obnSchedule[field] = field === 'occurrence' ? parseInt(value) : value;
+  } else {
+    if (!state.gigSchedules) state.gigSchedules = {};
+    if (!state.gigSchedules[id]) state.gigSchedules[id] = {};
+    state.gigSchedules[id][field] = field === 'occurrence' ? parseInt(value) : value;
+  }
+  saveData();
+  renderPaySchedules();
+  if (activeTab === 'home') renderMonthCalendar(currentMonth);
+}
+
 function renderHome() {
   const ym = currentMonth;
   const t = calcMonthTotals(ym);
@@ -2805,6 +3120,7 @@ function renderHome() {
 
   renderInterestTracking(ym, t);
   renderSurplusDebt(t);
+  renderMonthCalendar(ym);
 }
 
 /* ============================================================
@@ -3053,6 +3369,7 @@ function renderSplitweDebt() {
 function renderIncome() {
   renderOBN();
   renderGig();
+  renderPaySchedules();
   renderReceivables();
 }
 
@@ -3942,6 +4259,13 @@ function openDebtModal(id) {
     document.getElementById('debtCCRate').value  = d?.rate        || '';
     document.getElementById('debtCCMin').value   = d?.minimum     || '';
     updateCCPreview();
+    // Payment schedule
+    const psCC = d?.paySchedule || {};
+    document.getElementById('debtSchedFreq').value       = psCC.freq       || '';
+    document.getElementById('debtSchedDate').value       = psCC.dayOfMonth || '';
+    document.getElementById('debtSchedDayOfWeek').value  = psCC.dayOfWeek  || 'Monday';
+    document.getElementById('debtSchedOccurrence').value = psCC.occurrence || '1';
+    updateDebtSchedUI();
   } else {
     document.getElementById('debtNameLoan').value = d?.name     || '';
     document.getElementById('debtOriginal').value = d?.original || '';
@@ -3949,6 +4273,13 @@ function openDebtModal(id) {
     document.getElementById('debtRate').value     = d?.rate     || '';
     document.getElementById('debtFreq').value     = d?.payFreq  || 'monthly';
     document.getElementById('debtMin').value      = d?.minimum  || '';
+    // Payment schedule
+    const ps = d?.paySchedule || {};
+    document.getElementById('debtSchedFreq').value       = ps.freq       || '';
+    document.getElementById('debtSchedDate').value       = ps.dayOfMonth || '';
+    document.getElementById('debtSchedDayOfWeek').value  = ps.dayOfWeek  || 'Tuesday';
+    document.getElementById('debtSchedOccurrence').value = ps.occurrence || '2';
+    updateDebtSchedUI();
   }
   document.getElementById('debtModal').classList.add('open');
 }
@@ -3965,6 +4296,17 @@ function saveDebt() {
     const min   = parseFloat(document.getElementById('debtCCMin').value)   || 0;
     if (!name) { toast('Enter the card name', 'error'); return; }
     entry = { id: editingDebtId || uid(), type: 'credit_card', name, creditLimit: limit, balance: used, original: limit, rate, minimum: min };
+
+    // Read payment schedule
+    const psFreq = document.getElementById('debtSchedFreq').value;
+    const paySchedule = psFreq ? {
+      freq:       psFreq,
+      dayOfMonth: psFreq === 'monthly'  ? parseInt(document.getElementById('debtSchedDate').value)||null : null,
+      dayOfWeek:  psFreq !== 'monthly'  ? document.getElementById('debtSchedDayOfWeek').value : null,
+      occurrence: psFreq === 'biweekly' ? parseInt(document.getElementById('debtSchedOccurrence').value)||2 : null,
+    } : null;
+    if (paySchedule) entry.paySchedule = paySchedule;
+
   } else {
     const name     = document.getElementById('debtNameLoan').value.trim();
     const original = parseFloat(document.getElementById('debtOriginal').value) || 0;
@@ -3974,6 +4316,17 @@ function saveDebt() {
     if (!name) { toast('Enter a debt name', 'error'); return; }
     entry = { id: editingDebtId || uid(), type: 'loan', name, original, balance,
               rate, minimum, payFreq: document.getElementById('debtFreq').value || 'monthly' };
+
+    // Read payment schedule
+    const psFreq = document.getElementById('debtSchedFreq').value;
+    const paySchedule = psFreq ? {
+      freq:       psFreq,
+      dayOfMonth: psFreq === 'monthly'  ? parseInt(document.getElementById('debtSchedDate').value)||null : null,
+      dayOfWeek:  psFreq !== 'monthly'  ? document.getElementById('debtSchedDayOfWeek').value : null,
+      occurrence: psFreq === 'biweekly' ? parseInt(document.getElementById('debtSchedOccurrence').value)||2 : null,
+    } : null;
+    if (paySchedule) entry.paySchedule = paySchedule;
+
   }
 
   if (!state.debts) state.debts = [];
@@ -4882,20 +5235,186 @@ function deleteBankAcct(id) {
 /* ============================================================
    AUTO TRANSFERS
    ============================================================ */
+function getAccountOptions() {
+  // Returns array of { id, label } from bank accounts
+  return (state.bankAccounts || []).map(a => ({ id: a.id, label: a.name || a.type }));
+}
+
+function populateAccountDropdowns() {
+  const opts = getAccountOptions();
+  const placeholder = '<option value="">— Select account —</option>';
+  const html = placeholder + opts.map(o => `<option value="${o.id}">${o.label}</option>`).join('');
+  const fromEl = document.getElementById('transferFrom');
+  const toEl   = document.getElementById('transferTo');
+  if (fromEl) fromEl.innerHTML = html;
+  if (toEl)   toEl.innerHTML   = html;
+}
+
+function updateTransferTriggerUI() {
+  const freq = document.getElementById('transferFreq')?.value;
+  const dowWrap = document.getElementById('transferDayOfWeekWrap');
+  const calWrap = document.getElementById('transferCalendarWrap');
+  const lbl     = document.getElementById('transferTriggerLabel');
+
+  if (freq === 'monthly') {
+    if (dowWrap) dowWrap.style.display = 'none';
+    if (calWrap) calWrap.style.display = '';
+    renderTransferMiniCal();
+  } else {
+    if (dowWrap) dowWrap.style.display = '';
+    if (calWrap) calWrap.style.display = 'none';
+    if (lbl) lbl.textContent = freq === 'biweekly' ? 'Trigger Day (every 2nd occurrence)' : 'Trigger Day (every week)';
+    renderDayOfWeekBtns();
+  }
+}
+
+function renderDayOfWeekBtns() {
+  const wrap = document.getElementById('transferDayOfWeekBtns');
+  if (!wrap) return;
+  const current = document.getElementById('transferDayOfWeek')?.value || 'Monday';
+  const days = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'];
+  wrap.innerHTML = days.map(d => `
+    <button type="button" class="btn btn-sm ${d === current ? 'btn-primary' : 'btn-secondary'}"
+      onclick="selectTransferDay('${d}')" style="min-width:88px">${d}</button>
+  `).join('');
+}
+
+function selectTransferDay(day) {
+  const hidden = document.getElementById('transferDayOfWeek');
+  if (hidden) hidden.value = day;
+  renderDayOfWeekBtns();
+}
+
+function renderTransferMiniCal() {
+  const cal = document.getElementById('transferMiniCal');
+  const sel = document.getElementById('transferDay');
+  if (!cal) return;
+  const current = parseInt(sel?.value) || 0;
+  const dayHeaders = ['Su','Mo','Tu','We','Th','Fr','Sa'];
+  let html = dayHeaders.map(d => `<div style="text-align:center;font-size:0.65rem;color:var(--muted);font-weight:700;padding:2px">${d}</div>`).join('');
+
+  // Get current month to align days correctly
+  const [y, m] = currentMonth.split('-').map(Number);
+  const firstDay = new Date(y, m-1, 1).getDay(); // 0=Sun
+  const daysInMonth = new Date(y, m, 0).getDate();
+
+  // Empty cells before first day
+  for (let i = 0; i < firstDay; i++) {
+    html += '<div></div>';
+  }
+  // Day cells
+  for (let d = 1; d <= daysInMonth; d++) {
+    const active = d === current;
+    html += `<button type="button" onclick="selectTransferDate(${d})" style="
+      text-align:center;padding:4px 2px;border-radius:4px;font-size:0.75rem;font-weight:${active?'700':'400'};
+      background:${active?'var(--orange)':'transparent'};color:${active?'#000':'var(--text)'};
+      border:1px solid ${active?'var(--orange)':'transparent'};cursor:pointer;
+    ">${d}</button>`;
+  }
+  cal.innerHTML = html;
+
+  const dispEl = document.getElementById('transferCalSelected');
+  if (dispEl) dispEl.textContent = current > 0 ? ordinal(current) + ' of every month' : 'None';
+}
+
+function selectTransferDate(d) {
+  const hidden = document.getElementById('transferDay');
+  if (hidden) hidden.value = d;
+  renderTransferMiniCal();
+}
+
+let editingTransferId = null;
+function openTransferModal(id) {
+  editingTransferId = id || null;
+  const t = id ? (state.autoTransfers||[]).find(x => x.id === id) : null;
+  document.getElementById('transferModalTitle').textContent = t ? 'Edit Transfer' : 'Add Auto Transfer';
+  document.getElementById('transferName').value   = t?.name   || '';
+  document.getElementById('transferAmount').value = t?.amount || '';
+  document.getElementById('transferNotes').value  = t?.notes  || '';
+  document.getElementById('transferFreq').value   = t?.freq   || 'monthly';
+  document.getElementById('transferEditId').value = id || '';
+
+  populateAccountDropdowns();
+
+  // Restore from/to
+  setTimeout(() => {
+    const fromEl = document.getElementById('transferFrom');
+    const toEl   = document.getElementById('transferTo');
+    if (fromEl && t?.fromId) fromEl.value = t.fromId;
+    if (toEl   && t?.toId)   toEl.value   = t.toId;
+  }, 50);
+
+  // Restore trigger
+  const dow = document.getElementById('transferDayOfWeek');
+  const day = document.getElementById('transferDay');
+  if (dow) dow.value = t?.triggerDayOfWeek || 'Monday';
+  if (day) day.value = t?.triggerDay       || '';
+
+  updateTransferTriggerUI();
+  document.getElementById('transferModal').classList.add('open');
+  document.getElementById('transferName').focus();
+}
+
+function saveTransfer() {
+  const name   = document.getElementById('transferName').value.trim();
+  if (!name) { toast('Enter a transfer name', 'error'); return; }
+
+  const freq   = document.getElementById('transferFreq').value;
+  const fromId = document.getElementById('transferFrom').value;
+  const toId   = document.getElementById('transferTo').value;
+
+  // Get display names
+  const accounts = getAccountOptions();
+  const fromName = accounts.find(a => a.id === fromId)?.label || fromId;
+  const toName   = accounts.find(a => a.id === toId)?.label   || toId;
+
+  const entry = {
+    id:               editingTransferId || uid(),
+    name,
+    fromId,
+    toId,
+    from:             fromName,
+    to:               toName,
+    amount:           parseFloat(document.getElementById('transferAmount').value) || 0,
+    freq,
+    triggerDayOfWeek: freq !== 'monthly' ? document.getElementById('transferDayOfWeek').value : null,
+    triggerDay:       freq === 'monthly' ? parseInt(document.getElementById('transferDay').value)||null : null,
+    notes:            document.getElementById('transferNotes').value.trim(),
+    active:           true,
+  };
+
+  if (!state.autoTransfers) state.autoTransfers = [];
+  if (editingTransferId) {
+    const idx = state.autoTransfers.findIndex(x => x.id === editingTransferId);
+    if (idx >= 0) { entry.active = state.autoTransfers[idx].active; state.autoTransfers[idx] = entry; }
+  } else {
+    state.autoTransfers.push(entry);
+  }
+  closeModal('transferModal');
+  saveData(); renderTransfers();
+  if (activeTab === 'home') renderMonthCalendar(currentMonth);
+  toast('Transfer saved', 'success');
+}
+
+function toggleTransfer(id, active) {
+  const t = (state.autoTransfers||[]).find(x => x.id === id);
+  if (t) { t.active = active; saveData(); renderTransfers(); }
+}
+
+function deleteTransfer(id) {
+  state.autoTransfers = (state.autoTransfers||[]).filter(x => x.id !== id);
+  saveData(); renderTransfers();
+}
 function getTransferPaymentsThisMonth(t) {
-  // How many times does this transfer fire in the current month?
-  if (t.freq === 'monthly') return t.active ? 1 : 0;
-  if (t.freq === 'biweekly') {
-    // Use the same count as the car payment bi-weekly setting
-    const m = getMonth(currentMonth);
-    return t.active ? (m.biweekly?.['car_payment']?.count || 2) : 0;
-  }
-  if (t.freq === 'weekly') {
-    const m = getMonth(currentMonth);
-    return t.active ? (m.biweekly?.['car_payment']?.count || 4) : 0;
-  }
-  if (t.freq === 'perPaycheck') return t.active ? 2 : 0;
-  return 0;
+  if (!t.active) return 0;
+  const sched = {
+    freq: t.freq,
+    dayOfWeek: t.triggerDayOfWeek,
+    dayOfMonth: t.triggerDay,
+    occurrence: t.freq === 'biweekly' ? 2 : 1,
+  };
+  const dates = getDatesForSchedule(sched, currentMonth);
+  return dates.length || (t.freq === 'monthly' ? 1 : t.freq === 'biweekly' ? 2 : 4);
 }
 
 function renderTransfers() {
@@ -4952,16 +5471,22 @@ function renderTransfers() {
                     : t.freq === 'weekly'   ? 'Weekly'
                     : 'Per Paycheck';
 
-    const triggerLabel = t.triggerType === 'linkedDebt'
-      ? '📅 Same day as car payment'
-      : t.triggerType === 'date'
-        ? `📅 ${t.triggerDay ? ordinal(t.triggerDay) + ' of month' : '—'}`
-        : '📅 Day of paycheck';
+    const triggerLabel = t.freq === 'monthly' && t.triggerDay
+      ? `📅 ${ordinal(t.triggerDay)} of month`
+      : t.triggerDayOfWeek
+        ? `📅 Every${t.freq === 'biweekly' ? ' 2nd' : ''} ${t.triggerDayOfWeek}`
+        : '—';
 
-    return `<tr>
+    // Check if already marked done this month
+    const m = getMonth(currentMonth);
+    const doneKey = `transfer_done_${t.id}`;
+    const isDone = !!(m[doneKey]);
+
+    return `<tr style="${isDone ? 'opacity:0.7' : ''}">
       <td>
         <div class="fw-600">${t.name}</div>
         ${t.notes ? `<div class="text-xs text-muted mt-1">${t.notes}</div>` : ''}
+        ${isDone ? `<div class="text-xs text-green mt-1">✓ Done ${m[doneKey]}</div>` : ''}
       </td>
       <td class="text-sm text-dim">${t.from}</td>
       <td class="text-sm fw-600 text-teal">${t.to}</td>
@@ -4975,6 +5500,12 @@ function renderTransfers() {
           : '<span class="text-muted text-xs">—</span>'}
       </td>
       <td style="text-align:right;white-space:nowrap">
+        ${t.active && !isDone
+          ? `<button class="btn btn-sm" style="background:var(--green);color:#000;font-weight:700"
+               onclick="markTransferDone('${t.id}')">✓ Done</button>`
+          : isDone
+            ? `<button class="btn btn-sm btn-secondary text-xs" onclick="undoTransferDone('${t.id}')">↩ Undo</button>`
+            : ''}
         <label class="toggle" title="${t.active ? 'Disable' : 'Enable'}">
           <input type="checkbox" ${t.active ? 'checked' : ''} onchange="toggleTransfer('${t.id}',this.checked)" />
           <div class="toggle-track"></div><div class="toggle-thumb"></div>
@@ -4988,73 +5519,59 @@ function renderTransfers() {
   document.getElementById('transferMonthTotal').textContent = fmt(totalMonth, 0);
 }
 
+function markTransferDone(id) {
+  const t = (state.autoTransfers||[]).find(x => x.id === id);
+  if (!t) return;
+
+  // Update From account balance (subtract)
+  const fromAcct = (state.bankAccounts||[]).find(a => a.id === t.fromId);
+  const toAcct   = (state.bankAccounts||[]).find(a => a.id === t.toId);
+
+  if (fromAcct) fromAcct.balance = Math.max(0, (parseFloat(fromAcct.balance)||0) - t.amount);
+  if (toAcct)   toAcct.balance   = (parseFloat(toAcct.balance)||0) + t.amount;
+
+  // Mark done in this month's data with timestamp
+  const m = getMonth(currentMonth);
+  const now = new Date();
+  m[`transfer_done_${id}`] = now.toLocaleDateString('en-CA', { month: 'short', day: 'numeric' });
+
+  saveData();
+  renderTransfers();
+  renderAcctSummary();
+
+  const msg = fromAcct && toAcct
+    ? `✓ Transfer done — ${fromAcct.name} −${fmt(t.amount)} · ${toAcct.name} +${fmt(t.amount)}`
+    : `✓ Transfer marked as done`;
+  toast(msg, 'success');
+}
+
+function undoTransferDone(id) {
+  const t = (state.autoTransfers||[]).find(x => x.id === id);
+  if (!t) return;
+
+  // Reverse the balance changes
+  const fromAcct = (state.bankAccounts||[]).find(a => a.id === t.fromId);
+  const toAcct   = (state.bankAccounts||[]).find(a => a.id === t.toId);
+
+  if (fromAcct) fromAcct.balance = (parseFloat(fromAcct.balance)||0) + t.amount;
+  if (toAcct)   toAcct.balance   = Math.max(0, (parseFloat(toAcct.balance)||0) - t.amount);
+
+  // Remove done marker
+  const m = getMonth(currentMonth);
+  delete m[`transfer_done_${id}`];
+
+  saveData();
+  renderTransfers();
+  renderAcctSummary();
+  toast('↩ Transfer undone — balances restored', 'success');
+}
+
 function ordinal(n) {
   const s = ['th','st','nd','rd'], v = n % 100;
   return n + (s[(v-20)%10] || s[v] || s[0]);
 }
 
-function toggleTransfer(id, active) {
-  const t = (state.autoTransfers||[]).find(x => x.id === id);
-  if (t) { t.active = active; saveData(); renderTransfers(); }
-}
 
-function deleteTransfer(id) {
-  state.autoTransfers = (state.autoTransfers||[]).filter(x => x.id !== id);
-  saveData(); renderTransfers();
-}
-
-function updateTransferTriggerUI() {
-  const freq    = document.getElementById('transferFreq')?.value;
-  const trigger = document.getElementById('transferTriggerType')?.value;
-  const dayWrap = document.getElementById('transferDayWrap');
-  if (dayWrap) dayWrap.style.display = trigger === 'date' ? '' : 'none';
-}
-
-let editingTransferId = null;
-function openTransferModal(id) {
-  editingTransferId = id || null;
-  const t = id ? (state.autoTransfers||[]).find(x => x.id === id) : null;
-  document.getElementById('transferModalTitle').textContent = t ? 'Edit Transfer' : 'Add Auto Transfer';
-  document.getElementById('transferName').value        = t?.name        || '';
-  document.getElementById('transferFrom').value        = t?.from        || '';
-  document.getElementById('transferTo').value          = t?.to          || '';
-  document.getElementById('transferAmount').value      = t?.amount      || '';
-  document.getElementById('transferFreq').value        = t?.freq        || 'biweekly';
-  document.getElementById('transferTriggerType').value = t?.triggerType || 'linkedDebt';
-  document.getElementById('transferDay').value         = t?.triggerDay  || '';
-  document.getElementById('transferNotes').value       = t?.notes       || '';
-  document.getElementById('transferEditId').value      = id || '';
-  updateTransferTriggerUI();
-  document.getElementById('transferModal').classList.add('open');
-  document.getElementById('transferName').focus();
-}
-
-function saveTransfer() {
-  const name = document.getElementById('transferName').value.trim();
-  if (!name) { toast('Enter a transfer name', 'error'); return; }
-  const entry = {
-    id:          editingTransferId || uid(),
-    name,
-    from:        document.getElementById('transferFrom').value.trim(),
-    to:          document.getElementById('transferTo').value.trim(),
-    amount:      parseFloat(document.getElementById('transferAmount').value) || 0,
-    freq:        document.getElementById('transferFreq').value,
-    triggerType: document.getElementById('transferTriggerType').value,
-    triggerDay:  parseInt(document.getElementById('transferDay').value) || null,
-    notes:       document.getElementById('transferNotes').value.trim(),
-    active:      true,
-  };
-  if (!state.autoTransfers) state.autoTransfers = [];
-  if (editingTransferId) {
-    const idx = state.autoTransfers.findIndex(x => x.id === editingTransferId);
-    if (idx >= 0) { entry.active = state.autoTransfers[idx].active; state.autoTransfers[idx] = entry; }
-  } else {
-    state.autoTransfers.push(entry);
-  }
-  closeModal('transferModal');
-  saveData(); renderTransfers();
-  toast('Transfer saved', 'success');
-}
 
 /* ============================================================
    UPCOMING TAB
