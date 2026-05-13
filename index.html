@@ -753,6 +753,7 @@ input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; marg
           <span id="driveBtnLabel">Drive</span>
         </button>
         <button class="btn btn-secondary btn-sm" id="exportBtn" title="Export JSON">⬇ Export</button>
+        <button class="btn btn-secondary btn-sm" id="analysisBtn" title="Export text summary for AI analysis">📊 Analysis</button>
         <button class="btn btn-secondary btn-sm" id="importBtn" title="Import JSON">⬆ Import</button>
         <input type="file" id="importFile" accept=".json" class="hidden" />
       </div>
@@ -2248,6 +2249,134 @@ function loadData() {
       }
     }
   } catch(e) { console.warn('localStorage load failed', e); }
+}
+
+function generateAnalysisText() {
+  const ym = currentMonth;
+  const t  = calcMonthTotals(ym);
+  const m  = getMonth(ym);
+  const [y, mo] = ym.split('-').map(Number);
+  const monthName = new Date(y, mo-1, 1).toLocaleString('en-CA', { month: 'long', year: 'numeric' });
+
+  const lines = [];
+  lines.push('=== FINANCEOS ANALYSIS EXPORT ===');
+  lines.push(`Month: ${monthName}`);
+  lines.push(`Generated: ${new Date().toLocaleDateString('en-CA')}`);
+  lines.push('');
+
+  // Income
+  lines.push('--- INCOME ---');
+  const obnEntries = m.obn || [];
+  lines.push(`Salary (OBN): ${fmt(t.obnTotal)} (${obnEntries.length} paycheck${obnEntries.length!==1?'s':''})`);
+
+  const activePlatforms = state.platforms.filter(p => state.platformsActive[p.id] !== false);
+  activePlatforms.forEach(p => {
+    const g = m.gig?.[p.id] || {};
+    if ((parseFloat(g.net)||0) > 0) {
+      lines.push(`  ${p.name}: gross ${fmt(parseFloat(g.gross)||0)} | tips ${fmt(parseFloat(g.tips)||0)} | deductions ${fmt(parseFloat(g.deductions)||0)} | net ${fmt(parseFloat(g.net)||0)}`);
+    }
+  });
+  lines.push(`Gig Total: ${fmt(t.gigTotal)}`);
+
+  (state.govBenefits||[]).filter(b => b.active).forEach(b => {
+    const received = b.freq === 'monthly' || m[`benefit_received_${b.id}`];
+    if (received) lines.push(`${b.name} (${b.freq}): ${fmt(parseFloat(b.amount)||0)}`);
+  });
+  lines.push(`Benefits Total: ${fmt(t.benefitsTotal||0)}`);
+  lines.push(`TOTAL INCOME: ${fmt(t.totalIncome)}`);
+  lines.push('');
+
+  // Expenses
+  lines.push('--- FIXED EXPENSES ---');
+  getAllFixedCats().forEach(cat => {
+    const budgeted = getBudgeted('fixed', cat.id, m, cat.budgeted);
+    const actual   = parseFloat(m.fixed?.[cat.id]?.actual)||0;
+    if (budgeted > 0 || actual > 0)
+      lines.push(`  ${cat.name}: budgeted ${fmt(budgeted)} | actual ${fmt(actual)}`);
+  });
+  lines.push(`Fixed Total: budgeted ${fmt(t.fixedBudget)} | actual ${fmt(t.fixedActual)}`);
+  lines.push('');
+
+  lines.push('--- VARIABLE EXPENSES ---');
+  getAllVariableCats().forEach(cat => {
+    const budgeted = getBudgeted('variable', cat.id, m, cat.budgeted);
+    const actual   = parseFloat(m.variable?.[cat.id]?.actual)||0;
+    if (budgeted > 0 || actual > 0)
+      lines.push(`  ${cat.name}: budgeted ${fmt(budgeted)} | actual ${fmt(actual)}`);
+  });
+  lines.push(`Variable Total: budgeted ${fmt(t.varBudget)} | actual ${fmt(t.varActual)}`);
+  lines.push('');
+
+  lines.push(`TOTAL EXPENSES: ${fmt(t.totalExpense)}`);
+  lines.push(`NET SURPLUS / DEFICIT: ${fmt(t.net)} ${t.net >= 0 ? '(SURPLUS)' : '(DEFICIT)'}`);
+  lines.push('');
+
+  // Debts
+  lines.push('--- DEBTS ---');
+  const totalDebt = state.debts.reduce((s,d) => s + (parseFloat(d.balance)||0), 0);
+  state.debts.forEach(d => {
+    const bal  = parseFloat(d.balance)||0;
+    const rate = parseFloat(d.rate)||0;
+    const min  = parseFloat(d.minimum)||0;
+    if (d.type === 'credit_card') {
+      lines.push(`  ${d.name} [Credit Card]: balance ${fmt(bal)} | limit ${fmt(parseFloat(d.creditLimit)||0)} | rate ${rate}% | min payment ${fmt(min)}/mo`);
+    } else {
+      const freq = d.payFreq || 'monthly';
+      lines.push(`  ${d.name} [Loan]: balance ${fmt(bal)} | rate ${rate}% | payment ${fmt(min)}/${freq}`);
+    }
+  });
+  lines.push(`TOTAL DEBT: ${fmt(totalDebt)}`);
+  lines.push('');
+
+  // Bank Accounts
+  lines.push('--- BANK ACCOUNTS ---');
+  const totalCAD = (state.bankAccounts||[]).reduce((s,a) => s + acctToCAD(parseFloat(a.balance)||0, a.currency||'CAD'), 0);
+  (state.bankAccounts||[]).forEach(a => {
+    const cadVal = acctToCAD(parseFloat(a.balance)||0, a.currency||'CAD');
+    lines.push(`  ${a.name} [${a.type}]: ${a.currency||'CAD'} ${(parseFloat(a.balance)||0).toLocaleString('en-CA',{minimumFractionDigits:2,maximumFractionDigits:2})}${a.currency!=='CAD'?' (≈'+fmt(cadVal)+' CAD)':''}`);
+  });
+  lines.push(`TOTAL NET WORTH: ${fmt(totalCAD)} CAD`);
+  lines.push('');
+
+  // Investments
+  if ((state.investAccounts||[]).length > 0) {
+    lines.push('--- INVESTMENTS ---');
+    (state.investAccounts||[]).forEach(a => {
+      const cadVal = toCAD ? toCAD(parseFloat(a.balance)||0, a.currency||'CAD') : parseFloat(a.balance)||0;
+      lines.push(`  ${a.name} [${a.type}]: ${a.currency||'CAD'} ${(parseFloat(a.balance)||0).toLocaleString('en-CA',{minimumFractionDigits:2,maximumFractionDigits:2})}${a.currency!=='CAD'?' (≈'+fmt(cadVal)+' CAD)':''}`);
+    });
+    lines.push('');
+  }
+
+  // Baby Steps status
+  lines.push('--- DAVE RAMSEY BABY STEPS STATUS ---');
+  const ef = getEmergencyFundBalance();
+  const fullEF = getFullEmergencyFundBalance();
+  lines.push(`Emergency Fund (BS1): ${fmt(ef)} of $1,000 goal ${ef>=1000?'✓ DONE':'(in progress)'}`);
+  lines.push(`Full EF (BS3): ${fmt(fullEF)} of ${fmt(state.fullEFGoal||20000)} goal ${fullEF>=(state.fullEFGoal||20000)?'✓ DONE':'(in progress)'}`);
+  lines.push(`Total Debt (BS2): ${fmt(totalDebt)} ${totalDebt<=0?'✓ DEBT FREE':'(in progress)'}`);
+  lines.push('');
+
+  lines.push('=== END OF REPORT ===');
+  lines.push('');
+  lines.push('Please analyze this and tell me:');
+  lines.push('1. Where every surplus dollar should go');
+  lines.push('2. Am I on track with Dave Ramsey Baby Steps?');
+  lines.push('3. Which debt to attack first and how fast can I clear it?');
+  lines.push('4. How much interest am I losing per month?');
+  lines.push('5. Any areas where I can reduce spending?');
+
+  const text = lines.join('\n');
+
+  // Copy to clipboard
+  navigator.clipboard.writeText(text).then(() => {
+    toast('📊 Analysis report copied to clipboard — paste it in Claude chat!', 'success');
+  }).catch(() => {
+    // Fallback — show in a modal
+    const w = window.open('', '_blank', 'width=600,height=500');
+    w.document.write('<pre style="font-family:monospace;padding:1rem;white-space:pre-wrap">' + text + '</pre>');
+    w.document.title = 'FinanceOS Analysis Export';
+  });
 }
 
 function exportData() {
@@ -6093,6 +6222,7 @@ function bindEvents() {
   });
 
   // Export / Import
+  document.getElementById('analysisBtn').addEventListener('click', generateAnalysisText);
   document.getElementById('exportBtn').addEventListener('click', exportData);
   document.getElementById('importBtn').addEventListener('click', () => document.getElementById('importFile').click());
   document.getElementById('importFile').addEventListener('change', e => {
