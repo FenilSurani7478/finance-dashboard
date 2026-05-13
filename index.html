@@ -752,6 +752,7 @@ input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; marg
           <div class="drive-dot" id="driveDot"></div>
           <span id="driveBtnLabel">Drive</span>
         </button>
+        <button class="btn btn-teal btn-sm" id="headerSaveBtn" title="Save to Drive now">💾 Save</button>
         <button class="btn btn-secondary btn-sm" id="exportBtn" title="Export JSON">⬇ Export</button>
         <button class="btn btn-secondary btn-sm" id="analysisBtn" title="Export text summary for AI analysis">📊 Analysis</button>
         <button class="btn btn-secondary btn-sm" id="importBtn" title="Import JSON">⬆ Import</button>
@@ -2208,7 +2209,8 @@ async function silentDriveSave() {
 }
 
 function setAutoSaveStatus(status) {
-  const el = document.getElementById('autoSaveStatus');
+  const el  = document.getElementById('autoSaveStatus');
+  const btn = document.getElementById('headerSaveBtn');
   if (!el) return;
   const map = {
     pending: '● Unsaved changes',
@@ -2223,6 +2225,16 @@ function setAutoSaveStatus(status) {
                  : status === 'saving'  ? 'var(--teal)'
                  : status === 'failed'  ? 'var(--red)'
                  : 'var(--muted)';
+  // Button always visible — just update tooltip based on state
+  if (btn) {
+    btn.title = status === 'pending' ? 'Unsaved changes — click to save to Drive'
+              : status === 'saving'  ? 'Saving…'
+              : status === 'saved'   ? 'Saved to Drive'
+              : status === 'failed'  ? 'Save failed — click to retry'
+              : 'Save to Drive';
+    btn.style.opacity = driveToken ? '1' : '0.4';
+    btn.title = driveToken ? btn.title : 'Connect Drive first';
+  }
 }
 
 // Save to Drive when tab is hidden (user switches tabs, minimises, or closes)
@@ -6228,6 +6240,7 @@ function bindEvents() {
   });
 
   // Export / Import
+  document.getElementById('headerSaveBtn').addEventListener('click', () => silentDriveSave());
   document.getElementById('analysisBtn').addEventListener('click', generateAnalysisText);
   document.getElementById('exportBtn').addEventListener('click', exportData);
   document.getElementById('importBtn').addEventListener('click', () => document.getElementById('importFile').click());
